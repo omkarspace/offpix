@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/pack_models/build
+/captures
+.cxx
+
+# Large binary AI models are fetched via scripts/fetch_models.py
+pack_models/src/main/assets/models/*.tflite
+pack_models/src/main/assets/models/*.part

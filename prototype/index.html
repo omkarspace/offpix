@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>OffPix — Interactive Android Prototype</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: #12161f;
+    --surface-2: #191f2c;
+    --surface-3: #232b3b;
+    --border: rgba(255,255,255,0.08);
+    --text: #f3f6fc;
+    --text-2: #9aa6be;
+    --text-3: #6c778f;
+    --accent: #6ee7b7;
+    --accent-2: #38bdf8;
+    --accent-purple: #a78bfa;
+    --danger: #f87171;
+    --warn: #fbbf24;
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 24px 70px rgba(0,0,0,0.65);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(circle at 20% 15%, #162033 0%, #090b10 55%, #06070a 100%);
+    color: var(--text);
+    font-family: var(--font);
+    overflow: hidden;
+  }
+
+  /* Outer Desktop Showcase Layout */
+  .stage {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    padding: 20px;
+  }
+
+  /* Left Companion Panel (Desktop only) */
+  .companion {
+    width: 340px;
+    max-height: 92vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 4px;
+  }
+  .companion::-webkit-scrollbar { width: 4px; }
+  .companion::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+  .brand-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(110,231,183,0.1);
+    border: 1px solid rgba(110,231,183,0.28);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    width: fit-content;
+  }
+  .companion h1 {
+    font-size: 26px;
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+  }
+  .companion p {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-2);
+  }
+  .info-card {
+    background: rgba(18,22,31,0.85);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .info-card h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+  }
+  .screen-jump {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .jump-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.16s ease;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .jump-btn:hover { background: var(--surface-3); border-color: rgba(110,231,183,0.35); }
+  .jump-btn.active { background: rgba(110,231,183,0.14); border-color: var(--accent); color: var(--accent); }
+
+  .spec-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: var(--text-2);
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-row strong { color: var(--text); font-weight: 600; }
+  .spec-row .ok { color: var(--accent); }
+
+  /* Android Phone Frame */
+  .phone-shell {
+    width: 392px;
+    height: min(830px, 94vh);
+    background: #050608;
+    border-radius: 44px;
+    padding: 11px;
+    box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.12), inset 0 0 0 2px rgba(255,255,255,0.04);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .phone-screen {
+    flex: 1;
+    background: var(--bg);
+    border-radius: 34px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Android Status Bar */
+  .status-bar {
+    height: 36px;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--bg);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 20;
+  }
+  .camera-punch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.08);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .status-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .airplane-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(110,231,183,0.14);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* App Views Container */
+  .app-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .screen.active { display: flex; }
+
+  /* Top App Bar */
+  .top-bar {
+    height: 54px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11,13,18,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  .top-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    font-size: 15.5px;
+    letter-spacing: -0.01em;
+  }
+  .logo-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid;
+    place-items: center;
+    color: #061314;
+    font-weight: 900;
+    font-size: 14px;
+  }
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+  .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .save-pill {
+    height: 34px;
+    padding: 0 13px;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent);
+    color: #04130f;
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.12s, opacity 0.15s;
+  }
+  .save-pill:active { transform: scale(0.96); }
+  .save-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* HOME SCREEN */
+  .home-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 16px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .home-scroll::-webkit-scrollbar { display: none; }
+
+  .hero-card {
+    background: linear-gradient(155deg, #162235 0%, #111724 60%, #0f1b1d 100%);
+    border: 1px solid rgba(110,231,183,0.22);
+    border-radius: 22px;
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(110,231,183,0.12);
+    padding: 4px 10px;
+    border-radius: 999px;
+    width: fit-content;
+  }
+  .hero-card h2 {
+    font-size: 21px;
+    line-height: 1.22;
+    letter-spacing: -0.02em;
+  }
+  .hero-card p {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-2);
+  }
+  .primary-cta {
+    margin-top: 4px;
+    width: 100%;
+    height: 48px;
+    border-radius: 15px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #34d399);
+    color: #031510;
+    font-size: 14.5px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 10px 26px rgba(110,231,183,0.25);
+    transition: transform 0.12s;
+  }
+  .primary-cta:active { transform: scale(0.98); }
+
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-3);
+  }
+
+  .sample-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .sample-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.14s, border-color 0.14s;
+    display: flex;
+    flex-direction: column;
+  }
+  .sample-card:hover { border-color: rgba(110,231,183,0.45); transform: translateY(-2px); }
+  .sample-thumb {
+    width: 100%;
+    aspect-ratio: 1;
+    display: block;
+    background: #141923;
+  }
+  .sample-meta {
+    padding: 7px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sample-meta strong { font-size: 11.5px; color: var(--text); }
+  .sample-meta span { font-size: 10px; color: var(--accent); font-weight: 600; }
+
+  .tool-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .tool-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    padding: 12px 13px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .tool-card:hover { background: var(--surface-2); border-color: rgba(255,255,255,0.16); }
+  .tool-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .tool-icon.t1 { background: rgba(110,231,183,0.14); color: var(--accent); }
+  .tool-icon.t2 { background: rgba(56,189,248,0.14); color: var(--accent-2); }
+  .tool-icon.t3 { background: rgba(167,139,250,0.15); color: var(--accent-purple); }
+  .tool-card h4 { font-size: 13.5px; margin-bottom: 2px; }
+  .tool-card p { font-size: 11.5px; color: var(--text-2); line-height: 1.35; }
+
+  .recent-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .recent-strip::-webkit-scrollbar { display: none; }
+  .recent-item {
+    width: 84px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .recent-item img { width: 100%; height: 84px; object-fit: cover; display: block; }
+  .recent-item span {
+    display: block;
+    font-size: 10px;
+    color: var(--text-2);
+    padding: 4px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* EDITOR SCREEN */
+  .canvas-stage {
+    flex: 1;
+    position: relative;
+    background: #07090d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .viewport-box {
+    position: relative;
+    width: 340px;
+    height: 340px;
+    max-width: 92%;
+    max-height: 92%;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.1);
+    background: #10141d;
+  }
+  .viewport-box canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #afterClip {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  #maskCanvas {
+    z-index: 4;
+    cursor: crosshair;
+  }
+  #faceOverlayCanvas {
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* Before/After Slider Handle */
+  .ba-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #fff;
+    z-index: 7;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    display: none;
+    cursor: ew-resize;
+  }
+  .ba-divider.visible { display: block; }
+  .ba-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #fff;
+    color: #0b0d12;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.55);
+  }
+  .ba-tag {
+    position: absolute;
+    top: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: rgba(11,13,18,0.72);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    z-index: 6;
+    pointer-events: none;
+    display: none;
+  }
+  .ba-tag.visible { display: block; }
+  .ba-tag.left { left: 10px; }
+  .ba-tag.right { right: 10px; color: var(--accent); }
+
+  /* Inference HUD Overlay */
+  .processing-hud {
+    position: absolute;
+    inset: 0;
+    background: rgba(8,10,15,0.76);
+    backdrop-filter: blur(6px);
+    z-index: 12;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .processing-hud.visible { display: flex; }
+  .spinner {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid rgba(110,231,183,0.2);
+    border-top-color: var(--accent);
+    animation: spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hud-title { font-size: 13.5px; font-weight: 700; }
+  .hud-sub { font-size: 11px; color: var(--text-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .progress-track {
+    width: 210px;
+    height: 6px;
+    border-radius: 99px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width 0.08s linear;
+  }
+
+  /* Telemetry Pill over Canvas */
+  .canvas-pill {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(18,22,31,0.88);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 8;
+    white-space: nowrap;
+  }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+  /* Controls Drawer */
+  .controls-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .tab-panel { display: none; flex-direction: column; gap: 10px; }
+  .tab-panel.active { display: flex; }
+
+  .seg-row {
+    display: flex;
+    background: var(--bg);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    gap: 4px;
+  }
+  .seg-btn {
+    flex: 1;
+    height: 34px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .seg-btn.active {
+    background: var(--surface-3);
+    color: var(--text);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+    color: var(--text-2);
+  }
+  .slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .slider-row span.val {
+    width: 40px;
+    text-align: right;
+    color: var(--text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-run {
+    flex: 1;
+    height: 42px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #34d399);
+    color: #041510;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: transform 0.12s, opacity 0.15s;
+  }
+  .btn-run.blue { background: linear-gradient(135deg, #38bdf8, #60a5fa); color: #051320; }
+  .btn-run.purple { background: linear-gradient(135deg, #a78bfa, #c084fc); color: #120824; }
+  .btn-run:active { transform: scale(0.98); }
+  .btn-run:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn-secondary {
+    height: 42px;
+    padding: 0 13px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: var(--surface-3); }
+
+  .hint-line {
+    font-size: 11px;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .hint-line b { color: var(--accent-purple); }
+
+  /* Bottom 3-Tab Material 3 Navigation Bar */
+  .bottom-nav {
+    height: 66px;
+    background: #0e1118;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 6px 8px 8px;
+    flex-shrink: 0;
+  }
+  .nav-tab {
+    border: none;
+    background: transparent;
+    color: var(--text-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .nav-pill {
+    width: 54px;
+    height: 28px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    transition: background 0.16s, color 0.16s;
+  }
+  .nav-tab.active { color: var(--text); }
+  .nav-tab.active[data-tab="upscale"] .nav-pill { background: rgba(110,231,183,0.18); color: var(--accent); }
+  .nav-tab.active[data-tab="unblur"] .nav-pill { background: rgba(56,189,248,0.18); color: var(--accent-2); }
+  .nav-tab.active[data-tab="eraser"] .nav-pill { background: rgba(167,139,250,0.2); color: var(--accent-purple); }
+
+  /* Android Gesture Pill */
+  .gesture-bar {
+    height: 18px;
+    background: #0e1118;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .gesture-bar span {
+    width: 112px;
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(255,255,255,0.28);
+  }
+
+  /* Bottom Sheets (Export & Engine/Licenses) */
+  .sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.62);
+    backdrop-filter: blur(4px);
+    z-index: 30;
+    display: none;
+    align-items: flex-end;
+  }
+  .sheet-backdrop.open { display: flex; }
+  .sheet {
+    width: 100%;
+    max-height: 82%;
+    overflow-y: auto;
+    background: var(--surface);
+    border-top: 1px solid rgba(255,255,255,0.12);
+    border-radius: 24px 24px 0 0;
+    padding: 14px 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: slideUp 0.2s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .sheet-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(255,255,255,0.2);
+    margin: 0 auto 2px;
+  }
+  .sheet h3 { font-size: 16px; display: flex; align-items: center; justify-content: space-between; }
+  .model-row {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .model-row strong { font-size: 12.5px; display: block; }
+  .model-row span { font-size: 11px; color: var(--text-2); }
+  .badge-lic {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(110,231,183,0.13);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .toast {
+    position: absolute;
+    top: 46px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: #1c2433;
+    border: 1px solid rgba(110,231,183,0.4);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.22s ease;
+    white-space: nowrap;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Responsive: On small screens show only the phone full-bleed */
+  @media (max-width: 820px) {
+    .companion { display: none; }
+    .stage { padding: 0; }
+    .phone-shell { width: 100vw; height: 100vh; border-radius: 0; padding: 0; box-shadow: none; }
+    .phone-screen { border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+<input type="file" id="fileInput" accept="image/*" hidden />
+
+<div class="stage">
+  <!-- Desktop Companion Guide -->
+  <aside class="companion">
+    <div class="brand-pill">✈️ 100% Offline Interactive Prototype</div>
+    <h1>OffPix</h1>
+    <p>
+      Interactive walkthrough of all Android Material 3 screens. Upload your own photo or pick any built-in test scene to try <strong>4x Upscale</strong>, <strong>Unblur + Face Rescue</strong>, and <strong>Tap-to-Select Magic Eraser</strong> live in the browser.
+    </p>
+
+    <div class="info-card">
+      <h3>Jump to Any Screen</h3>
+      <div class="screen-jump">
+        <button class="jump-btn active" data-jump="home">🏠 Photo Picker</button>
+        <button class="jump-btn" data-jump="upscale">✨ 4x Upscale</button>
+        <button class="jump-btn" data-jump="unblur">🎯 Unblur & Face</button>
+        <button class="jump-btn" data-jump="eraser">🪄 Magic Eraser</button>
+        <button class="jump-btn" data-jump="export">💾 Save & EXIF</button>
+        <button class="jump-btn" data-jump="engine">⚙️ Engine & Licenses</button>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <h3>Verified Target Stack</h3>
+      <div class="spec-row"><span>Runtime</span><strong>LiteRT CompiledModel</strong></div>
+      <div class="spec-row"><span>Hardware Path</span><strong class="ok">NPU → GPU → CPU</strong></div>
+      <div class="spec-row"><span>Target App Size</span><strong class="ok">~312 MB (&lt; 500 MB)</strong></div>
+      <div class="spec-row"><span>Network / Ads / Login</span><strong class="ok">Zero (100% Local)</strong></div>
+      <div class="spec-row"><span>Licenses</span><strong>MIT / BSD-3 / Apache 2.0</strong></div>
+    </div>
+
+    <div class="info-card">
+      <h3>Try This Live</h3>
+      <p style="font-size:12px">
+        1. Open <strong>Travel Scene</strong> → tap the <strong>photobomber</strong>, <strong>trash can</strong>, or <strong>power lines</strong> in Magic Eraser, then hit <strong>Erase Object</strong>.<br><br>
+        2. Open <strong>Blurry Portrait</strong> → switch to <strong>Portrait Restore</strong> to see YuNet 5-point landmarks + GFPGAN restore.<br><br>
+        3. Upload any photo from your device and drag the <strong>Before / After</strong> slider.
+      </p>
+    </div>
+  </aside>
+
+  <!-- Android Device Shell -->
+  <main class="phone-shell">
+    <div class="phone-screen">
+      <!-- Android Status Bar -->
+      <div class="status-bar">
+        <span>9:41</span>
+        <div class="camera-punch"></div>
+        <div class="status-right">
+          <span class="airplane-chip">✈️ OFFLINE</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      <div class="toast" id="toast">Saved to Gallery</div>
+
+      <div class="app-body">
+        <!-- ================= SCREEN 1: HOME / PHOTO PICKER ================= -->
+        <section class="screen active" id="screen-home">
+          <header class="top-bar">
+            <div class="top-title">
+              <div class="logo-dot">O</div>
+              <span>OffPix</span>
+            </div>
+            <button class="icon-btn" id="openEngineHome" title="On-Device Engine & Licenses">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+          </header>
+
+          <div class="home-scroll">
+            <div class="hero-card">
+              <div class="hero-badge">🔒 100% On-Device • Zero Cloud • Zero Ads</div>
+              <h2>Rescue any photo in seconds.</h2>
+              <p>Flagship 4x upscaling, motion unblur, face restore, and magic object removal—running locally on your phone's GPU.</p>
+              <button class="primary-cta" id="pickPhotoBtn">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                Pick a Photo from Device
+              </button>
+            </div>
+
+            <div class="section-head">
+              <span>Try Built-In Test Photos</span>
+              <span style="color:var(--accent)">Instant Demo</span>
+            </div>
+            <div class="sample-grid" id="sampleGrid"></div>
+
+            <div class="section-head">
+              <span>3 Offline Studio Tools</span>
+              <span>312 MB Ready</span>
+            </div>
+            <div class="tool-cards">
+              <div class="tool-card" data-quick-tab="upscale">
+                <div class="tool-icon t1">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                </div>
+                <div>
+                  <h4>4x HD Upscale</h4>
+                  <p>Real-ESRGAN x4v3 sharpens low-res WhatsApp forwards & old scans.</p>
+                </div>
+              </div>
+              <div class="tool-card" data-quick-tab="unblur">
+                <div class="tool-icon t2">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M5 20c1.5-3.5 4.2-5 7-5s5.5 1.5 7 5"/></svg>
+                </div>
+                <div>
+                  <h4>Unblur &amp; Face Rescue</h4>
+                  <p>NAFNet fixes camera shake; YuNet + GFPGAN reconstructs faces.</p>
+                </div>
+              </div>
+              <div class="tool-card" data-quick-tab="eraser">
+                <div class="tool-icon t3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 20H7L3 16a2 2 0 0 1 0-2.8l9.9-9.9a2 2 0 0 1 2.8 0L21 8.6a2 2 0 0 1 0 2.8L12.4 20"/><path d="M9.5 6.5l8 8"/></svg>
+                </div>
+                <div>
+                  <h4>Magic Eraser</h4>
+                  <p>SAM 2.1 tap-to-select + MI-GAN removes photobombers in milliseconds.</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="recentSection" style="display:none; flex-direction:column; gap:10px;">
+              <div class="section-head">
+                <span>Recent Rescues (Local)</span>
+                <span id="recentCount">0</span>
+              </div>
+              <div class="recent-strip" id="recentStrip"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SCREEN 2: 3-TAB STUDIO EDITOR ================= -->
+        <section class="screen" id="screen-editor">
+          <header class="top-bar">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="icon-btn" id="backHomeBtn" title="Back to Photo Picker">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button class="icon-btn" id="swapPhotoBtn" title="Pick Another Photo">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              </button>
+              <button class="icon-btn" id="undoBtn" title="Reset Current Edit" disabled>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="icon-btn" id="openEngineEditor" title="Engine Status">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              </button>
+              <button class="save-pill" id="openExportBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Save
+              </button>
+            </div>
+          </header>
+
+          <!-- Interactive Canvas Stage -->
+          <div class="canvas-stage" id="canvasStage">
+            <div class="viewport-box" id="viewportBox">
+              <canvas id="beforeCanvas" width="512" height="512"></canvas>
+              <div id="afterClip">
+                <canvas id="afterCanvas" width="512" height="512"></canvas>
+              </div>
+              <canvas id="maskCanvas" width="512" height="512"></canvas>
+              <canvas id="faceOverlayCanvas" width="512" height="512"></canvas>
+
+              <div class="ba-tag left" id="tagBefore">BEFORE</div>
+              <div class="ba-tag right" id="tagAfter">AFTER</div>
+
+              <div class="ba-divider" id="baDivider" style="left:50%;">
+                <div class="ba-knob">⇄</div>
+              </div>
+
+              <div class="processing-hud" id="processingHud">
+                <div class="spinner"></div>
+                <div class="hud-title" id="hudTitle">Running LiteRT GPU...</div>
+                <div class="hud-sub" id="hudSub">Tile 1/16 • 128×128 → 512×512</div>
+                <div class="progress-track"><div class="progress-fill" id="hudProgress"></div></div>
+              </div>
+            </div>
+
+            <div class="canvas-pill" id="canvasPill">
+              <span class="dot-live"></span>
+              <span id="pillText">GPU (ML Drift) Ready • 512×512</span>
+            </div>
+          </div>
+
+          <!-- Context Controls Drawer -->
+          <div class="controls-panel">
+            <!-- TAB 1: UPSCALE -->
+            <div class="tab-panel active" id="panel-upscale">
+              <div class="seg-row" id="scaleSeg">
+                <button class="seg-btn" data-scale="2">2x Fast HD</button>
+                <button class="seg-btn active" data-scale="4">4x Ultra HD</button>
+              </div>
+              <div class="slider-row">
+                <span>Detail Sharpness</span>
+                <input type="range" id="upscaleStrength" min="30" max="100" value="80" />
+                <span class="val" id="upscaleStrengthVal">80%</span>
+              </div>
+              <div class="action-row">
+                <button class="btn-run" id="runUpscaleBtn">✨ Enhance 4x HD (Real-ESRGAN)</button>
+              </div>
+            </div>
+
+            <!-- TAB 2: UNBLUR & FACE -->
+            <div class="tab-panel" id="panel-unblur">
+              <div class="seg-row" id="unblurSeg">
+                <button class="seg-btn active" data-mode="quick">Quick Fix (NAFNet)</button>
+                <button class="seg-btn" data-mode="portrait">Portrait Restore (GFPGAN)</button>
+              </div>
+              <div class="slider-row">
+                <span>Restoration Strength</span>
+                <input type="range" id="unblurStrength" min="40" max="100" value="85" />
+                <span class="val" id="unblurStrengthVal">85%</span>
+              </div>
+              <div class="action-row">
+                <button class="btn-run blue" id="runUnblurBtn">🎯 Fix Motion Blur (NAFNet)</button>
+              </div>
+            </div>
+
+            <!-- TAB 3: MAGIC ERASER -->
+            <div class="tab-panel" id="panel-eraser">
+              <div class="seg-row" id="eraserSeg">
+                <button class="seg-btn active" data-tool="tap">👆 Tap Object (SAM 2.1)</button>
+                <button class="seg-btn" data-tool="brush">🖌️ Brush Mask</button>
+              </div>
+              <div class="hint-line" id="eraserHint">
+                <span>Tap any person, pole, or object to auto-mask</span>
+                <b id="maskStatus">No mask</b>
+              </div>
+              <div class="slider-row" id="brushSizeRow" style="display:none;">
+                <span>Brush Size</span>
+                <input type="range" id="brushSize" min="12" max="54" value="26" />
+                <span class="val" id="brushSizeVal">26 px</span>
+              </div>
+              <div class="action-row">
+                <button class="btn-secondary" id="clearMaskBtn">Clear</button>
+                <button class="btn-run purple" id="runEraseBtn" disabled>🪄 Erase Selection (MI-GAN)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Material 3 Bottom Navigation -->
+          <nav class="bottom-nav">
+            <button class="nav-tab active" data-tab="upscale">
+              <div class="nav-pill">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              </div>
+              <span>Upscale</span>
+            </button>
+            <button class="nav-tab" data-tab="unblur">
+              <div class="nav-pill">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M5 20c1.5-3.5 4.2-5 7-5s5.5 1.5 7 5"/></svg>
+              </div>
+              <span>Unblur &amp; Face</span>
+            </button>
+            <button class="nav-tab" data-tab="eraser">
+              <div class="nav-pill">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 20H7L3 16a2 2 0 0 1 0-2.8l9.9-9.9a2 2 0 0 1 2.8 0L21 8.6a2 2 0 0 1 0 2.8L12.4 20"/></svg>
+              </div>
+              <span>Magic Eraser</span>
+            </button>
+          </nav>
+        </section>
+
+        <!-- ================= SHEET: EXPORT / SAVE ================= -->
+        <div class="sheet-backdrop" id="exportSheet">
+          <div class="sheet">
+            <div class="sheet-handle"></div>
+            <h3>
+              <span>Save Rescued Photo</span>
+              <button class="icon-btn" data-close-sheet="exportSheet" style="width:30px;height:30px;">✕</button>
+            </h3>
+            <div class="model-row">
+              <div>
+                <strong>Output Resolution</strong>
+                <span id="exportDimText">2048 × 2048 px • Ready Offline</span>
+              </div>
+              <span class="badge-lic">0 Watermarks</span>
+            </div>
+            <div class="seg-row" id="formatSeg">
+              <button class="seg-btn active" data-fmt="image/jpeg">JPEG 95% (Fast)</button>
+              <button class="seg-btn" data-fmt="image/png">PNG Lossless</button>
+            </div>
+            <label class="model-row" style="cursor:pointer;">
+              <div>
+                <strong>Preserve EXIF Metadata</strong>
+                <span>Keep original date, orientation &amp; camera info</span>
+              </div>
+              <input type="checkbox" id="keepExif" checked style="width:18px;height:18px;accent-color:var(--accent);" />
+            </label>
+            <button class="primary-cta" id="confirmSaveBtn">💾 Save to Gallery (Download)</button>
+          </div>
+        </div>
+
+        <!-- ================= SHEET: ON-DEVICE ENGINE & LICENSES ================= -->
+        <div class="sheet-backdrop" id="engineSheet">
+          <div class="sheet">
+            <div class="sheet-handle"></div>
+            <h3>
+              <span>On-Device AI Engine</span>
+              <button class="icon-btn" data-close-sheet="engineSheet" style="width:30px;height:30px;">✕</button>
+            </h3>
+            <div class="model-row" style="border-color:rgba(110,231,183,0.3);background:rgba(110,231,183,0.07);">
+              <div>
+                <strong style="color:var(--accent)">LiteRT CompiledModel • Active</strong>
+                <span>Priority: NPU → GPU (ML Drift) → CPU (XNNPACK)</span>
+              </div>
+              <span class="badge-lic">✈️ 0 KB Sent</span>
+            </div>
+            <div class="model-row"><div><strong>Real-ESRGAN General x4v3</strong><span>3.5 MB • FP16 • 4x Super-Resolution</span></div><span class="badge-lic">BSD-3</span></div>
+            <div class="model-row"><div><strong>NAFNet-GoPro-width32</strong><span>38.3 MB • FP16 • Motion Deblur</span></div><span class="badge-lic">MIT</span></div>
+            <div class="model-row"><div><strong>YuNet + GFPGAN v1.4 (Quantized)</strong><span>0.3 MB + ~145 MB • Face Align &amp; Restore</span></div><span class="badge-lic">MIT / Apache 2.0</span></div>
+            <div class="model-row"><div><strong>SAM 2.1 Hiera-Tiny (Enc + Dec)</strong><span>80 MB + 17 MB • Tap-to-Select Mask</span></div><span class="badge-lic">Apache 2.0</span></div>
+            <div class="model-row"><div><strong>MI-GAN 512 Places2</strong><span>16.3 MB • FP16 • Object Inpainting</span></div><span class="badge-lic">MIT</span></div>
+            <p style="font-size:11px;color:var(--text-3);line-height:1.45;">
+              Total offline footprint: ~312 MB (incl. app). Zero internet permission, zero analytics, zero accounts, zero ads.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Android Gesture Handle -->
+      <div class="gesture-bar"><span></span></div>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  // ---------- STATE ----------
+  const SIZE = 512;
+  const state = {
+    currentScreen: 'home',
+    activeTab: 'upscale',
+    sampleId: 'city',
+    scaleFactor: 4,
+    unblurMode: 'quick',
+    eraserTool: 'tap',
+    brushSize: 26,
+    exportFormat: 'image/jpeg',
+    hasProcessed: false,
+    splitPos: 0.5,
+    samEncoded: false,
+    hasMask: false,
+    isDrawing: false,
+    isDraggingSplit: false,
+    recents: [],
+    // Keep clean pristine version for sample scenes so demo comparisons look super crisp
+    pristineCanvas: document.createElement('canvas'),
+    degradedCanvas: document.createElement('canvas'),
+    // Regions for interactive SAM 2.1 tap-to-select on Travel sample
+    sampleObjects: [],
+    erasedObjects: new Set()
+  };
+  state.pristineCanvas.width = SIZE;
+  state.pristineCanvas.height = SIZE;
+  state.degradedCanvas.width = SIZE;
+  state.degradedCanvas.height = SIZE;
+
+  // ---------- DOM REFS ----------
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+
+  const beforeCanvas = $('#beforeCanvas');
+  const afterCanvas = $('#afterCanvas');
+  const maskCanvas = $('#maskCanvas');
+  const faceOverlayCanvas = $('#faceOverlayCanvas');
+  const beforeCtx = beforeCanvas.getContext('2d', { willReadFrequently: true });
+  const afterCtx = afterCanvas.getContext('2d', { willReadFrequently: true });
+  const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+  const faceCtx = faceOverlayCanvas.getContext('2d');
+  const afterClip = $('#afterClip');
+  const baDivider = $('#baDivider');
+  const tagBefore = $('#tagBefore');
+  const tagAfter = $('#tagAfter');
+  const viewportBox = $('#viewportBox');
+
+  // ---------- PROCEDURAL BUILT-IN TEST PHOTOS (ZERO EXTERNAL URLS) ----------
+  function renderCityScene(ctx, crisp) {
+    // Rich dusk skyline
+    const sky = ctx.createLinearGradient(0, 0, 0, SIZE * 0.72);
+    sky.addColorStop(0, '#0f172a');
+    sky.addColorStop(0.55, '#312e81');
+    sky.addColorStop(1, '#f97316');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Sun glow
+    const sun = ctx.createRadialGradient(SIZE * 0.65, SIZE * 0.56, 8, SIZE * 0.65, SIZE * 0.56, 150);
+    sun.addColorStop(0, 'rgba(254,215,170,0.95)');
+    sun.addColorStop(0.4, 'rgba(251,146,60,0.45)');
+    sun.addColorStop(1, 'rgba(251,146,60,0)');
+    ctx.fillStyle = sun;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Buildings
+    const buildings = [
+      [18, 220, 72, 220], [82, 165, 68, 275], [142, 240, 58, 200],
+      [195, 130, 78, 310], [268, 195, 64, 245], [326, 150, 82, 290],
+      [402, 210, 92, 230]
+    ];
+    buildings.forEach(([x, y, w, h], idx) => {
+      ctx.fillStyle = idx % 2 === 0 ? '#111827' : '#1e293b';
+      ctx.fillRect(x, y, w, h);
+      // Crisp lit windows
+      for (let wy = y + 14; wy < 385; wy += 18) {
+        for (let wx = x + 10; wx < x + w - 12; wx += 14) {
+          const lit = ((wx * 7 + wy * 13 + idx * 5) % 11) > 4;
+          ctx.fillStyle = lit ? '#fde68a' : 'rgba(148,163,184,0.12)';
+          ctx.fillRect(wx, wy, 7, 10);
+        }
+      }
+    });
+
+    // Water reflection
+    const water = ctx.createLinearGradient(0, 390, 0, SIZE);
+    water.addColorStop(0, '#1e1b4b');
+    water.addColorStop(1, '#090d16');
+    ctx.fillStyle = water;
+    ctx.fillRect(0, 390, SIZE, SIZE - 390);
+    for (let i = 0; i < 42; i++) {
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(253,230,138,0.22)' : 'rgba(251,146,60,0.2)';
+      const rx = (i * 37) % 460;
+      const ry = 398 + (i * 19) % 105;
+      ctx.fillRect(rx, ry, 28 + (i % 24), 3);
+    }
+
+    // Crisp sign text to show 4x sharpness
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(198, 140, 72, 22);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('METRO 4K', 202, 155);
+
+    if (!crisp) {
+      // Simulate heavy WhatsApp low-res pixelation + compression
+      const small = document.createElement('canvas');
+      small.width = 96; small.height = 96;
+      const sctx = small.getContext('2d');
+      sctx.drawImage(ctx.canvas, 0, 0, 96, 96);
+      ctx.imageSmoothingEnabled = true;
+      ctx.clearRect(0, 0, SIZE, SIZE);
+      ctx.drawImage(small, 0, 0, SIZE, SIZE);
+    }
+  }
+
+  function renderPortraitScene(ctx, crisp) {
+    // Soft bokeh studio background
+    const bg = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+    bg.addColorStop(0, '#1e293b');
+    bg.addColorStop(1, '#3b1d38');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Bokeh circles
+    [[90, 90, 48, 'rgba(251,191,36,0.18)'], [420, 120, 62, 'rgba(56,189,248,0.16)'], [410, 380, 52, 'rgba(244,114,182,0.15)']].forEach(([x, y, r, c]) => {
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // Shoulders & shirt
+    ctx.fillStyle = '#0f766e';
+    ctx.beginPath();
+    ctx.ellipse(256, 485, 165, 105, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    // Neck
+    ctx.fillStyle = '#d49a74';
+    ctx.fillRect(222, 330, 68, 72);
+
+    // Hair back
+    ctx.fillStyle = '#1f1614';
+    ctx.beginPath();
+    ctx.ellipse(256, 225, 118, 138, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Face oval
+    const skin = ctx.createRadialGradient(246, 220, 20, 256, 245, 115);
+    skin.addColorStop(0, '#f4c6a4');
+    skin.addColorStop(1, '#d99b73');
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.ellipse(256, 245, 92, 114, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hair bangs
+    ctx.fillStyle = '#1f1614';
+    ctx.beginPath();
+    ctx.arc(256, 185, 98, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.fill();
+
+    // Eyebrows
+    ctx.strokeStyle = '#2c1d18';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(196, 212); ctx.quadraticCurveTo(216, 202, 236, 212); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(276, 212); ctx.quadraticCurveTo(296, 202, 316, 212); ctx.stroke();
+
+    // Eyes
+    [216, 296].forEach((ex) => {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(ex, 234, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3b2416';
+      ctx.beginPath(); ctx.arc(ex, 234, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#09090b';
+      ctx.beginPath(); ctx.arc(ex, 234, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex - 3, 231, 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // Nose
+    ctx.strokeStyle = 'rgba(130,78,50,0.55)';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(256, 236); ctx.lineTo(249, 274); ctx.quadraticCurveTo(256, 281, 265, 274); ctx.stroke();
+
+    // Smile
+    ctx.strokeStyle = '#a84c4c';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(224, 304); ctx.quadraticCurveTo(256, 326, 288, 304); ctx.stroke();
+
+    if (!crisp) {
+      // Simulate camera-shake motion blur
+      const tmp = document.createElement('canvas');
+      tmp.width = SIZE; tmp.height = SIZE;
+      const tctx = tmp.getContext('2d');
+      tctx.filter = 'blur(5.5px)';
+      tctx.drawImage(ctx.canvas, 0, 0);
+      ctx.clearRect(0, 0, SIZE, SIZE);
+      ctx.globalAlpha = 0.65;
+      ctx.drawImage(tmp, -7, 0);
+      ctx.drawImage(tmp, 7, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function renderTravelScene(ctx, includeClutter) {
+    // Clean mountain & lake postcard
+    const sky = ctx.createLinearGradient(0, 0, 0, 290);
+    sky.addColorStop(0, '#0284c7');
+    sky.addColorStop(1, '#bae6fd');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, SIZE, 290);
+
+    // Clouds
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    [[110, 88, 34], [142, 82, 42], [178, 90, 30], [360, 72, 32], [392, 68, 38]].forEach(([x, y, r]) => {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // Mountains
+    ctx.fillStyle = '#334155';
+    ctx.beginPath(); ctx.moveTo(0, 290); ctx.lineTo(135, 130); ctx.lineTo(270, 290); ctx.fill();
+    ctx.fillStyle = '#475569';
+    ctx.beginPath(); ctx.moveTo(185, 290); ctx.lineTo(355, 112); ctx.lineTo(512, 290); ctx.fill();
+    // Snow caps
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath(); ctx.moveTo(135, 130); ctx.lineTo(106, 166); ctx.lineTo(135, 158); ctx.lineTo(164, 166); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(355, 112); ctx.lineTo(322, 154); ctx.lineTo(355, 144); ctx.lineTo(388, 154); ctx.fill();
+
+    // Lake
+    const lake = ctx.createLinearGradient(0, 290, 0, 400);
+    lake.addColorStop(0, '#0369a1');
+    lake.addColorStop(1, '#0ea5e9');
+    ctx.fillStyle = lake;
+    ctx.fillRect(0, 290, SIZE, 110);
+
+    // Grass foreground
+    const grass = ctx.createLinearGradient(0, 395, 0, SIZE);
+    grass.addColorStop(0, '#16a34a');
+    grass.addColorStop(1, '#14532d');
+    ctx.fillStyle = grass;
+    ctx.fillRect(0, 395, SIZE, SIZE - 395);
+
+    // Walkway
+    ctx.fillStyle = '#cbd5e1';
+    ctx.beginPath(); ctx.moveTo(190, 512); ctx.lineTo(235, 395); ctx.lineTo(285, 395); ctx.lineTo(340, 512); ctx.fill();
+
+    if (includeClutter) {
+      // Object 1: Power lines across sky
+      if (!state.erasedObjects.has('wires')) {
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(0, 52); ctx.quadraticCurveTo(256, 112, 512, 46); ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(0, 74); ctx.quadraticCurveTo(256, 132, 512, 68); ctx.stroke();
+      }
+      // Object 2: Photobomber on right
+      if (!state.erasedObjects.has('person')) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.roundRect(352, 318, 56, 92, 16); ctx.fill(); // jacket
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(360, 405, 16, 72); ctx.fillRect(384, 405, 16, 72); // legs
+        ctx.fillStyle = '#f5cba7';
+        ctx.beginPath(); ctx.arc(380, 294, 21, 0, Math.PI * 2); ctx.fill(); // head
+        ctx.fillStyle = '#111827';
+        ctx.beginPath(); ctx.arc(380, 286, 21, Math.PI, Math.PI * 2); ctx.fill(); // cap
+      }
+      // Object 3: Trash can on left
+      if (!state.erasedObjects.has('trash')) {
+        ctx.fillStyle = '#475569';
+        ctx.beginPath(); ctx.roundRect(68, 388, 58, 76, 8); ctx.fill();
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(62, 378, 70, 14);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(82, 406, 8, 42); ctx.fillRect(104, 406, 8, 42);
+      }
+    }
+  }
+
+  const SAMPLES = [
+    { id: 'city', title: 'Low-Res City', tag: '4x Upscale', defaultTab: 'upscale' },
+    { id: 'portrait', title: 'Blurry Face', tag: 'Unblur/Face', defaultTab: 'unblur' },
+    { id: 'travel', title: 'Photobomber', tag: 'Magic Eraser', defaultTab: 'eraser' }
+  ];
+
+  function buildSampleThumbnails() {
+    const grid = $('#sampleGrid');
+    grid.innerHTML = '';
+    SAMPLES.forEach((s) => {
+      const card = document.createElement('div');
+      card.className = 'sample-card';
+      const c = document.createElement('canvas');
+      c.width = SIZE; c.height = SIZE;
+      c.className = 'sample-thumb';
+      const cctx = c.getContext('2d');
+      if (s.id === 'city') renderCityScene(cctx, false);
+      if (s.id === 'portrait') renderPortraitScene(cctx, false);
+      if (s.id === 'travel') { state.erasedObjects.clear(); renderTravelScene(cctx, true); }
+
+      const meta = document.createElement('div');
+      meta.className = 'sample-meta';
+      meta.innerHTML = `<strong>${s.title}</strong><span>${s.tag}</span>`;
+      card.appendChild(c);
+      card.appendChild(meta);
+      card.onclick = () => loadSample(s.id, s.defaultTab);
+      grid.appendChild(card);
+    });
+  }
+
+  // ---------- LOAD PHOTO ----------
+  function loadSample(id, tab) {
+    state.sampleId = id;
+    state.erasedObjects.clear();
+    const pctx = state.pristineCanvas.getContext('2d');
+    const dctx = state.degradedCanvas.getContext('2d');
+
+    if (id === 'city') {
+      renderCityScene(pctx, true);
+      renderCityScene(dctx, false);
+      state.sampleObjects = [];
+    } else if (id === 'portrait') {
+      renderPortraitScene(pctx, true);
+      renderPortraitScene(dctx, false);
+      state.sampleObjects = [];
+    } else {
+      renderTravelScene(pctx, false);
+      renderTravelScene(dctx, true);
+      state.sampleObjects = [
+        { id: 'person', label: 'Photobomber', x: 344, y: 266, w: 72, h: 218 },
+        { id: 'trash', label: 'Trash Can', x: 56, y: 372, w: 82, h: 98 },
+        { id: 'wires', label: 'Power Lines', x: 0, y: 36, w: 512, h: 102 }
+      ];
+    }
+
+    beforeCtx.clearRect(0, 0, SIZE, SIZE);
+    beforeCtx.drawImage(state.degradedCanvas, 0, 0);
+    afterCtx.clearRect(0, 0, SIZE, SIZE);
+    afterCtx.drawImage(state.degradedCanvas, 0, 0);
+
+    resetEditOverlays();
+    openScreen('editor');
+    switchTab(tab || 'upscale');
+  }
+
+  function loadUploadedFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        state.sampleId = 'custom';
+        state.sampleObjects = [];
+        state.erasedObjects.clear();
+        // Center-crop square into 512x512 preview canvas
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        const dctx = state.degradedCanvas.getContext('2d');
+        const pctx = state.pristineCanvas.getContext('2d');
+        dctx.clearRect(0, 0, SIZE, SIZE);
+        dctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, SIZE, SIZE);
+        pctx.clearRect(0, 0, SIZE, SIZE);
+        pctx.drawImage(state.degradedCanvas, 0, 0);
+
+        beforeCtx.clearRect(0, 0, SIZE, SIZE);
+        beforeCtx.drawImage(state.degradedCanvas, 0, 0);
+        afterCtx.clearRect(0, 0, SIZE, SIZE);
+        afterCtx.drawImage(state.degradedCanvas, 0, 0);
+
+        resetEditOverlays();
+        openScreen('editor');
+        showToast('Photo loaded locally (0 bytes uploaded)');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetEditOverlays() {
+    state.hasProcessed = false;
+    state.samEncoded = false;
+    state.hasMask = false;
+    maskCtx.clearRect(0, 0, SIZE, SIZE);
+    faceCtx.clearRect(0, 0, SIZE, SIZE);
+    baDivider.classList.remove('visible');
+    tagBefore.classList.remove('visible');
+    tagAfter.classList.remove('visible');
+    afterClip.style.clipPath = 'inset(0 0 0 100%)';
+    $('#undoBtn').disabled = true;
+    $('#runEraseBtn').disabled = true;
+    $('#maskStatus').textContent = 'No mask';
+    updatePill('GPU (ML Drift) Ready • Offline');
+  }
+
+  // ---------- NAVIGATION ----------
+  function openScreen(name) {
+    state.currentScreen = name;
+    $$('.screen').forEach((s) => s.classList.remove('active'));
+    $(`#screen-${name}`).classList.add('active');
+    syncCompanionButtons();
+  }
+
+  function switchTab(tab) {
+    state.activeTab = tab;
+    $$('.nav-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    $$('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${tab}`));
+    faceCtx.clearRect(0, 0, SIZE, SIZE);
+
+    if (tab === 'eraser') {
+      maskCanvas.style.pointerEvents = 'auto';
+      if (!state.samEncoded) runSamEncoderSim();
+    } else {
+      maskCanvas.style.pointerEvents = 'none';
+      maskCtx.clearRect(0, 0, SIZE, SIZE);
+      state.hasMask = false;
+      $('#runEraseBtn').disabled = true;
+    }
+    syncCompanionButtons();
+  }
+
+  function syncCompanionButtons() {
+    $$('.jump-btn').forEach((b) => {
+      const target = b.dataset.jump;
+      const isActive =
+        (target === 'home' && state.currentScreen === 'home') ||
+        (state.currentScreen === 'editor' && target === state.activeTab);
+      b.classList.toggle('active', isActive);
+    });
+  }
+
+  // ---------- BEFORE/AFTER SLIDER ----------
+  function enableBeforeAfter(afterLabel) {
+    state.hasProcessed = true;
+    state.splitPos = 0.5;
+    updateSplitUI();
+    baDivider.classList.add('visible');
+    tagBefore.classList.add('visible');
+    tagAfter.classList.add('visible');
+    tagAfter.textContent = afterLabel || 'AFTER';
+    $('#undoBtn').disabled = false;
+  }
+
+  function updateSplitUI() {
+    const pct = Math.max(0.04, Math.min(0.96, state.splitPos)) * 100;
+    baDivider.style.left = pct + '%';
+    afterClip.style.clipPath = `inset(0 0 0 ${pct}%)`;
+  }
+
+  function pointerToSplit(clientX) {
+    const rect = viewportBox.getBoundingClientRect();
+    state.splitPos = (clientX - rect.left) / rect.width;
+    updateSplitUI();
+  }
+
+  baDivider.addEventListener('pointerdown', (e) => {
+    state.isDraggingSplit = true;
+    baDivider.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (state.isDraggingSplit) pointerToSplit(e.clientX);
+  });
+  window.addEventListener('pointerup', () => { state.isDraggingSplit = false; });
+
+  // ---------- REAL CLIENT-SIDE IMAGE FILTERS ----------
+  function applyUnsharpMask(sourceCanvas, targetCtx, amount) {
+    // True 3x3 unsharp mask + local contrast boost for custom uploaded photos
+    const w = SIZE, h = SIZE;
+    const srcCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const src = srcCtx.getImageData(0, 0, w, h);
+    const out = targetCtx.createImageData(w, h);
+    const d = src.data, o = out.data;
+    const k = amount * 1.4;
+
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          const center = d[i + c];
+          const avg = (
+            d[i - 4 + c] + d[i + 4 + c] +
+            d[i - w * 4 + c] + d[i + w * 4 + c]
+          ) * 0.25;
+          let v = center + (center - avg) * k;
+          // Subtle micro-contrast
+          v = ((v / 255 - 0.5) * (1 + amount * 0.14) + 0.5) * 255;
+          o[i + c] = Math.max(0, Math.min(255, v));
+        }
+        o[i + 3] = 255;
+      }
+    }
+    targetCtx.putImageData(out, 0, 0);
+  }
+
+  // ---------- PROCESSING HUD HELPER ----------
+  function runTimedPipeline({ title, steps, onDone }) {
+    const hud = $('#processingHud');
+    const hTitle = $('#hudTitle');
+    const hSub = $('#hudSub');
+    const hProg = $('#hudProgress');
+    hud.classList.add('visible');
+    hTitle.textContent = title;
+    let idx = 0;
+
+    function next() {
+      if (idx >= steps.length) {
+        hud.classList.remove('visible');
+        onDone();
+        return;
+      }
+      const st = steps[idx++];
+      hSub.textContent = st.label;
+      hProg.style.width = st.pct + '%';
+      setTimeout(next, st.ms);
+    }
+    next();
+  }
+
+  // ---------- TAB 1: 4X UPSCALE ----------
+  $('#scaleSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    $$('#scaleSeg .seg-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.scaleFactor = Number(btn.dataset.scale);
+    $('#runUpscaleBtn').textContent = `✨ Enhance ${state.scaleFactor}x HD (Real-ESRGAN)`;
+  });
+
+  $('#upscaleStrength').addEventListener('input', (e) => {
+    $('#upscaleStrengthVal').textContent = e.target.value + '%';
+  });
+
+  $('#runUpscaleBtn').addEventListener('click', () => {
+    const strength = Number($('#upscaleStrength').value) / 100;
+    runTimedPipeline({
+      title: `Real-ESRGAN ${state.scaleFactor}x HD (GPU)`,
+      steps: [
+        { label: 'Tile 4/16 • 128×128 → 512×512 • 4 ms', pct: 25, ms: 160 },
+        { label: 'Tile 9/16 • Feathering 64px overlap', pct: 58, ms: 170 },
+        { label: 'Tile 16/16 • Clamping RGB [0, 1]', pct: 100, ms: 160 }
+      ],
+      onDone: () => {
+        if (state.sampleId === 'city') {
+          afterCtx.clearRect(0, 0, SIZE, SIZE);
+          afterCtx.drawImage(state.pristineCanvas, 0, 0);
+        } else {
+          applyUnsharpMask(beforeCanvas, afterCtx, strength);
+        }
+        enableBeforeAfter(`${state.scaleFactor}x HD`);
+        updatePill(`Done in 41 ms • GPU ML Drift • ${state.scaleFactor}x Output`);
+      }
+    });
+  });
+
+  // ---------- TAB 2: UNBLUR & FACE RESCUE ----------
+  $('#unblurSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    $$('#unblurSeg .seg-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.unblurMode = btn.dataset.mode;
+    $('#runUnblurBtn').textContent =
+      state.unblurMode === 'quick'
+        ? '🎯 Fix Motion Blur (NAFNet)'
+        : '👤 Detect & Restore Face (YuNet + GFPGAN)';
+  });
+
+  $('#unblurStrength').addEventListener('input', (e) => {
+    $('#unblurStrengthVal').textContent = e.target.value + '%';
+  });
+
+  function drawYuNetOverlay() {
+    faceCtx.clearRect(0, 0, SIZE, SIZE);
+    // Bounding box + 5 facial landmarks (eyes, nose, mouth corners)
+    faceCtx.strokeStyle = '#38bdf8';
+    faceCtx.lineWidth = 3;
+    faceCtx.setLineDash([7, 5]);
+    faceCtx.strokeRect(154, 128, 204, 232);
+    faceCtx.setLineDash([]);
+
+    faceCtx.fillStyle = 'rgba(56,189,248,0.9)';
+    faceCtx.fillRect(154, 106, 134, 20);
+    faceCtx.fillStyle = '#04121f';
+    faceCtx.font = 'bold 11px sans-serif';
+    faceCtx.fillText('YuNet Face 99.4% • 5 pts', 160, 120);
+
+    const pts = [[216, 234], [296, 234], [256, 272], [228, 306], [284, 306]];
+    pts.forEach(([x, y]) => {
+      faceCtx.fillStyle = '#6ee7b7';
+      faceCtx.beginPath(); faceCtx.arc(x, y, 5, 0, Math.PI * 2); faceCtx.fill();
+      faceCtx.strokeStyle = '#04130f'; faceCtx.lineWidth = 1.5; faceCtx.stroke();
+    });
+  }
+
+  $('#runUnblurBtn').addEventListener('click', () => {
+    const strength = Number($('#unblurStrength').value) / 100;
+    if (state.unblurMode === 'quick') {
+      runTimedPipeline({
+        title: 'NAFNet-GoPro Deblur (GPU)',
+        steps: [
+          { label: 'Tiling 256×256 • 32px overlap', pct: 35, ms: 180 },
+          { label: 'Running NAFNet FP16 • 42 ms/tile', pct: 75, ms: 190 },
+          { label: 'Blending seamless tiles...', pct: 100, ms: 140 }
+        ],
+        onDone: () => {
+          faceCtx.clearRect(0, 0, SIZE, SIZE);
+          if (state.sampleId === 'portrait') {
+            afterCtx.clearRect(0, 0, SIZE, SIZE);
+            afterCtx.filter = 'blur(1.2px)';
+            afterCtx.drawImage(state.pristineCanvas, 0, 0);
+            afterCtx.filter = 'none';
+          } else {
+            applyUnsharpMask(beforeCanvas, afterCtx, strength * 0.9);
+          }
+          enableBeforeAfter('UNBLURRED');
+          updatePill('NAFNet Complete • 168 ms • GPU');
+        }
+      });
+    } else {
+      // Portrait Restore: Show YuNet 5-point landmarks first!
+      drawYuNetOverlay();
+      runTimedPipeline({
+        title: 'YuNet + GFPGAN v1.4 Restore',
+        steps: [
+          { label: 'YuNet 640×640 BGR • 1 face (4 ms)', pct: 28, ms: 260 },
+          { label: 'Umeyama 5-pt FFHQ similarity warp', pct: 56, ms: 200 },
+          { label: 'GFPGAN v1.4 [1,3,512,512] • 89 ms', pct: 86, ms: 240 },
+          { label: 'Inverse warp & soft alpha blend', pct: 100, ms: 160 }
+        ],
+        onDone: () => {
+          if (state.sampleId === 'portrait') {
+            afterCtx.clearRect(0, 0, SIZE, SIZE);
+            afterCtx.drawImage(state.pristineCanvas, 0, 0);
+          } else {
+            applyUnsharpMask(beforeCanvas, afterCtx, strength * 1.15);
+          }
+          setTimeout(() => faceCtx.clearRect(0, 0, SIZE, SIZE), 1400);
+          enableBeforeAfter('FACE RESTORED');
+          updatePill('GFPGAN v1.4 Complete • 93 ms • NPU/GPU');
+        }
+      });
+    }
+  });
+
+  // ---------- TAB 3: MAGIC ERASER (SAM 2.1 + MI-GAN) ----------
+  function runSamEncoderSim() {
+    runTimedPipeline({
+      title: 'SAM 2.1 Image Encoder (1×)',
+      steps: [
+        { label: 'Resizing to 1024×1024 ImageNet NCHW', pct: 45, ms: 160 },
+        { label: 'Caching FPN embeddings • 240 ms', pct: 100, ms: 180 }
+      ],
+      onDone: () => {
+        state.samEncoded = true;
+        updatePill('SAM 2.1 Ready • Tap any object (18 ms)');
+      }
+    });
+  }
+
+  $('#eraserSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    $$('#eraserSeg .seg-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.eraserTool = btn.dataset.tool;
+    $('#brushSizeRow').style.display = state.eraserTool === 'brush' ? 'flex' : 'none';
+    $('#eraserHint').firstElementChild.textContent =
+      state.eraserTool === 'tap'
+        ? 'Tap any person, pole, or object to auto-mask'
+        : 'Paint directly over marks or edges to erase';
+  });
+
+  $('#brushSize').addEventListener('input', (e) => {
+    state.brushSize = Number(e.target.value);
+    $('#brushSizeVal').textContent = state.brushSize + ' px';
+  });
+
+  function getCanvasCoords(e) {
+    const rect = maskCanvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * SIZE,
+      y: ((e.clientY - rect.top) / rect.height) * SIZE
+    };
+  }
+
+  function paintBrushAt(x, y) {
+    maskCtx.fillStyle = 'rgba(167,139,250,0.58)';
+    maskCtx.beginPath();
+    maskCtx.arc(x, y, state.brushSize, 0, Math.PI * 2);
+    maskCtx.fill();
+    state.hasMask = true;
+    $('#runEraseBtn').disabled = false;
+    $('#maskStatus').textContent = 'Brush mask ready';
+  }
+
+  function samTapSelect(x, y) {
+    // Check named objects on the travel scene first
+    if (state.sampleId === 'travel') {
+      const hit = state.sampleObjects.find(
+        (o) => !state.erasedObjects.has(o.id) && x >= o.x && x <= o.x + o.w && y >= o.y && y <= o.y + o.h
+      );
+      if (hit) {
+        maskCtx.fillStyle = 'rgba(167,139,250,0.58)';
+        maskCtx.strokeStyle = '#c4b5fd';
+        maskCtx.lineWidth = 3;
+        maskCtx.beginPath();
+        maskCtx.roundRect(hit.x, hit.y, hit.w, hit.h, 14);
+        maskCtx.fill();
+        maskCtx.stroke();
+        state.hasMask = true;
+        state.lastSelectedSampleObj = hit.id;
+        $('#runEraseBtn').disabled = false;
+        $('#maskStatus').textContent = `${hit.label} • 18 ms`;
+        updatePill(`SAM 2.1 Decoder: ${hit.label} (IoU 0.94 • 18 ms)`);
+        return;
+      }
+    }
+    // Generic smart color-region select for any uploaded photo!
+    const img = beforeCtx.getImageData(0, 0, SIZE, SIZE).data;
+    const cx = Math.floor(x), cy = Math.floor(y);
+    const ci = (cy * SIZE + cx) * 4;
+    const tr = img[ci], tg = img[ci + 1], tb = img[ci + 2];
+    const rMax = 48;
+    maskCtx.fillStyle = 'rgba(167,139,250,0.6)';
+    for (let dy = -rMax; dy <= rMax; dy += 3) {
+      for (let dx = -rMax; dx <= rMax; dx += 3) {
+        if (dx * dx + dy * dy > rMax * rMax) continue;
+        const px = cx + dx, py = cy + dy;
+        if (px < 0 || py < 0 || px >= SIZE || py >= SIZE) continue;
+        const idx = (py * SIZE + px) * 4;
+        const dist = Math.abs(img[idx] - tr) + Math.abs(img[idx + 1] - tg) + Math.abs(img[idx + 2] - tb);
+        if (dist < 115) maskCtx.fillRect(px, py, 3, 3);
+      }
+    }
+    state.hasMask = true;
+    $('#runEraseBtn').disabled = false;
+    $('#maskStatus').textContent = 'Region masked • 21 ms';
+    updatePill('SAM 2.1 Decoder: Object selected (21 ms)');
+  }
+
+  maskCanvas.addEventListener('pointerdown', (e) => {
+    if (state.activeTab !== 'eraser') return;
+    const { x, y } = getCanvasCoords(e);
+    if (state.eraserTool === 'tap') {
+      samTapSelect(x, y);
+    } else {
+      state.isDrawing = true;
+      maskCanvas.setPointerCapture(e.pointerId);
+      paintBrushAt(x, y);
+    }
+  });
+  maskCanvas.addEventListener('pointermove', (e) => {
+    if (state.isDrawing && state.eraserTool === 'brush') {
+      const { x, y } = getCanvasCoords(e);
+      paintBrushAt(x, y);
+    }
+  });
+  maskCanvas.addEventListener('pointerup', () => { state.isDrawing = false; });
+
+  $('#clearMaskBtn').addEventListener('click', () => {
+    maskCtx.clearRect(0, 0, SIZE, SIZE);
+    state.hasMask = false;
+    state.lastSelectedSampleObj = null;
+    $('#runEraseBtn').disabled = true;
+    $('#maskStatus').textContent = 'No mask';
+  });
+
+  function inpaintMaskedRegion(srcCtx, mCtx, dstCtx) {
+    // Real pixel-level iterative diffusion inpainting from surrounding known pixels
+    const src = srcCtx.getImageData(0, 0, SIZE, SIZE);
+    const m = mCtx.getImageData(0, 0, SIZE, SIZE).data;
+    const d = new Uint8ClampedArray(src.data);
+
+    // Collect masked pixel coordinates
+    const hole = [];
+    for (let y = 2; y < SIZE - 2; y++) {
+      for (let x = 2; x < SIZE - 2; x++) {
+        const i = (y * SIZE + x) * 4;
+        if (m[i + 3] > 30) hole.push([x, y, i]);
+      }
+    }
+    // Fill horizontally/vertically from nearest boundary then diffuse smoothly
+    for (let pass = 0; pass < 26; pass++) {
+      for (let k = 0; k < hole.length; k++) {
+        const [x, y, i] = hole[k];
+        const left = i - 4, right = i + 4, up = i - SIZE * 4, down = i + SIZE * 4;
+        d[i]     = (d[left] + d[right] + d[up] + d[down]) >> 2;
+        d[i + 1] = (d[left + 1] + d[right + 1] + d[up + 1] + d[down + 1]) >> 2;
+        d[i + 2] = (d[left + 2] + d[right + 2] + d[up + 2] + d[down + 2]) >> 2;
+      }
+    }
+    dstCtx.putImageData(new ImageData(d, SIZE, SIZE), 0, 0);
+  }
+
+  $('#runEraseBtn').addEventListener('click', () => {
+    if (!state.hasMask) return;
+    runTimedPipeline({
+      title: 'MI-GAN 512 Inpainting (GPU)',
+      steps: [
+        { label: 'Packing [mask-0.5, rgb*mask] NCHW', pct: 40, ms: 130 },
+        { label: 'MI-GAN Places2 FP16 • 14 ms', pct: 80, ms: 150 },
+        { label: 'Compositing feathered patch...', pct: 100, ms: 120 }
+      ],
+      onDone: () => {
+        if (state.sampleId === 'travel' && state.lastSelectedSampleObj) {
+          state.erasedObjects.add(state.lastSelectedSampleObj);
+          state.lastSelectedSampleObj = null;
+          afterCtx.clearRect(0, 0, SIZE, SIZE);
+          renderTravelScene(afterCtx, true);
+        } else {
+          inpaintMaskedRegion(beforeCtx, maskCtx, afterCtx);
+        }
+        maskCtx.clearRect(0, 0, SIZE, SIZE);
+        state.hasMask = false;
+        $('#runEraseBtn').disabled = true;
+        $('#maskStatus').textContent = 'Erased!';
+        enableBeforeAfter('ERASED');
+        updatePill('MI-GAN Erased in 14 ms • GPU ML Drift');
+      }
+    });
+  });
+
+  // ---------- UNDO / RESET ----------
+  $('#undoBtn').addEventListener('click', () => {
+    state.erasedObjects.clear();
+    if (state.sampleId === 'travel') {
+      renderTravelScene(beforeCtx, true);
+    }
+    afterCtx.clearRect(0, 0, SIZE, SIZE);
+    afterCtx.drawImage(beforeCanvas, 0, 0);
+    resetEditOverlays();
+    showToast('Reset to original photo');
+  });
+
+  // ---------- SHEETS & EXPORT ----------
+  function openSheet(id) { $(`#${id}`).classList.add('open'); }
+  function closeSheet(id) { $(`#${id}`).classList.remove('open'); }
+
+  $$('[data-close-sheet]').forEach((b) => b.addEventListener('click', () => closeSheet(b.dataset.closeSheet)));
+  $$('.sheet-backdrop').forEach((bg) => bg.addEventListener('click', (e) => {
+    if (e.target === bg) bg.classList.remove('open');
+  }));
+
+  $('#openEngineHome').onclick = () => openSheet('engineSheet');
+  $('#openEngineEditor').onclick = () => openSheet('engineSheet');
+
+  $('#openExportBtn').onclick = () => {
+    const dim = state.activeTab === 'upscale' && state.hasProcessed ? 512 * state.scaleFactor : 1024;
+    $('#exportDimText').textContent = `${dim} × ${dim} px • Ready Offline`;
+    openSheet('exportSheet');
+  };
+
+  $('#formatSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    $$('#formatSeg .seg-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.exportFormat = btn.dataset.fmt;
+  });
+
+  $('#confirmSaveBtn').addEventListener('click', () => {
+    const source = state.hasProcessed ? afterCanvas : beforeCanvas;
+    const ext = state.exportFormat === 'image/png' ? 'png' : 'jpg';
+    const dataUrl = source.toDataURL(state.exportFormat, 0.95);
+
+    // Real file download
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `offpix-${state.activeTab}.${ext}`;
+    a.click();
+
+    // Add to Recent Rescues on Home
+    state.recents.unshift({ url: dataUrl, label: state.activeTab.toUpperCase() });
+    renderRecents();
+    closeSheet('exportSheet');
+    showToast('Saved locally with EXIF preserved');
+  });
+
+  function renderRecents() {
+    if (!state.recents.length) return;
+    $('#recentSection').style.display = 'flex';
+    $('#recentCount').textContent = state.recents.length;
+    const strip = $('#recentStrip');
+    strip.innerHTML = '';
+    state.recents.slice(0, 6).forEach((item) => {
+      const div = document.createElement('div');
+      div.className = 'recent-item';
+      div.innerHTML = `<img src="${item.url}" alt="" /><span>${item.label}</span>`;
+      strip.appendChild(div);
+    });
+  }
+
+  // ---------- WIRE BUTTONS ----------
+  $('#pickPhotoBtn').onclick = () => $('#fileInput').click();
+  $('#swapPhotoBtn').onclick = () => $('#fileInput').click();
+  $('#fileInput').addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) loadUploadedFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  $('#backHomeBtn').onclick = () => openScreen('home');
+
+  $$('.nav-tab').forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+  $$('.tool-card').forEach((card) => card.addEventListener('click', () => {
+    const tab = card.dataset.quickTab;
+    const sample = tab === 'upscale' ? 'city' : tab === 'unblur' ? 'portrait' : 'travel';
+    loadSample(sample, tab);
+  }));
+
+  // Companion desktop quick-jump buttons
+  $$('.jump-btn').forEach((btn) => btn.addEventListener('click', () => {
+    const target = btn.dataset.jump;
+    closeSheet('exportSheet');
+    closeSheet('engineSheet');
+    if (target === 'home') openScreen('home');
+    else if (target === 'export') {
+      if (state.currentScreen !== 'editor') loadSample('city', 'upscale');
+      openSheet('exportSheet');
+    } else if (target === 'engine') {
+      openSheet('engineSheet');
+    } else {
+      const sample = target === 'upscale' ? 'city' : target === 'unblur' ? 'portrait' : 'travel';
+      loadSample(sample, target);
+    }
+  }));
+
+  function updatePill(text) { $('#pillText').textContent = text; }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Init
+  buildSampleThumbnails();
+})();
+</script>
+</body>
+</html>
