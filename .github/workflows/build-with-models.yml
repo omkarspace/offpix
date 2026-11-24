@@ -39,6 +39,9 @@ jobs:
         run: |
           mkdir -p app/src/main/assets/models
           cp pack_models/src/main/assets/models/*.tflite app/src/main/assets/models/
+          if [ -f app/src/main/assets/models/gfpgan_v14_fp16.tflite ] && [ ! -f app/src/main/assets/models/gfpgan_v14_opt.tflite ]; then
+            mv app/src/main/assets/models/gfpgan_v14_fp16.tflite app/src/main/assets/models/gfpgan_v14_opt.tflite
+          fi
           ls -lh app/src/main/assets/models/
 
       - name: Set up JDK 17

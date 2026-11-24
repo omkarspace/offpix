@@ -1,0 +1,49 @@
+name: Quantize GFPGAN v1.4 (Sub-175 MB LiteRT)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Quantization profile: fp16 (~174 MB) or w8a16 (~110 MB)"
+        required: true
+        default: "fp16"
+        type: choice
+        options:
+          - fp16
+          - w8a16
+
+jobs:
+  quantize-gfpgan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyTorch CPU, GFPGAN, and LiteRT Torch
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install gfpgan basicsr facexlib ai-edge-torch ai-edge-litert
+
+      - name: Download official Apache 2.0 GFPGANv1.4.pth
+        run: |
+          curl -fSL https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth -o GFPGANv1.4.pth
+          ls -lh GFPGANv1.4.pth
+
+      - name: Quantize & export gfpgan_v14_opt.tflite
+        run: |
+          python scripts/quantize_gfpgan.py --weights GFPGANv1.4.pth --profile "${{ github.event.inputs.profile }}"
+          python scripts/inspect_models.py
+
+      - name: Upload quantized gfpgan_v14_opt.tflite artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gfpgan-v14-${{ github.event.inputs.profile }}-litert
+          path: pack_models/src/main/assets/models/gfpgan_v14_opt.tflite
+          retention-days: 14
