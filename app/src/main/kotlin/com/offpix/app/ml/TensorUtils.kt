@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ml
+package com.offpix.app.ml
 
 import android.graphics.Bitmap
 import android.graphics.Canvas

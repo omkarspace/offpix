@@ -54,6 +54,9 @@ class LiteRtRuntime(private val appContext: Context) : Closeable {
         runCatching { appContext.assets.open(id.assetPath).use { true } }.getOrDefault(false)
     }
 
+    fun readAssetBytes(assetPath: String): ByteArray =
+        appContext.assets.open(assetPath).use { it.readBytes() }
+
     suspend fun getOrLoad(id: ModelId): LoadedModel = withContext(inferenceDispatcher) {
         loaded[id]?.let { return@withContext it }
 

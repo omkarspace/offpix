@@ -3,26 +3,40 @@ package com.offpix.app.ml
 import android.graphics.Bitmap
 import android.graphics.Color
 import kotlinx.coroutines.withContext
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * SAM 2.1 Hiera-Tiny interactive tap-to-segment runner.
+ * SAM 2.1 Hiera-Tiny interactive tap-to-segment runner (v2 GPU-fixed models).
  *
- * 1. `encodeImage(bitmap)`: Runs `sam2_tiny_image_encoder_v2_fp16.tflite` ONCE per photo
- *    ([1, 3, 1024, 1024] ImageNet NCHW) and caches its 3 FPN feature maps in RAM.
- * 2. `decodeTap(normX, normY)`: Runs `sam2_tiny_mask_decoder_v2_fp16.tflite` in ~10-30 ms
- *    per user tap, picks the mask candidate with highest `iou_scores`, and renders the
- *    binary selection into the photo-space mask bitmap.
+ * Uses the exact 3,072-byte `models/prompt_encode_const.bin` constants
+ * (`posmat [256]`, `pointEmbed [256]`, `notAPoint [256]`) from
+ * `litert-community/SAM2.1-Hiera-Tiny-Mask-Decoder` for bit-exact point prompt encoding.
  */
 class Sam2Runner(private val runtime: LiteRtRuntime) {
 
+    companion object {
+        private const val PROMPT_CONST_ASSET = "models/prompt_encode_const.bin"
+        private const val IMG_SIZE = 1024f
+        private const val EMB_SIZE = 256 * 64 * 64
+        private const val FEAT_S1_SIZE = 64 * 128 * 128
+        private const val FEAT_S0_SIZE = 32 * 256 * 256
+    }
+
+    private data class PromptConstants(
+        val posmat: FloatArray,     // 256 floats [2, 128]
+        val pointEmbed: FloatArray, // 256 floats
+        val notAPoint: FloatArray   // 256 floats
+    )
+
     data class CachedEmbeddings(
         val photoHash: Int,
-        val level0: FloatArray, // [1, 256, 256, 256] or projected [1, 32, 256, 256]
-        val level1: FloatArray, // [1, 256, 128, 128] or projected [1, 64, 128, 128]
-        val level2: FloatArray  // [1, 256, 64, 64] image_embeddings
+        val imageEmbeddings: FloatArray, // [1, 256, 64, 64]
+        val featS1: FloatArray,          // [1, 64, 128, 128]
+        val featS0: FloatArray           // [1, 32, 256, 256]
     )
 
     data class TapMaskResult(
@@ -32,11 +46,26 @@ class Sam2Runner(private val runtime: LiteRtRuntime) {
     )
 
     private var cache: CachedEmbeddings? = null
+    private var promptConsts: PromptConstants? = null
 
     fun isEncodedFor(bitmap: Bitmap): Boolean = cache?.photoHash == bitmap.hashCode()
 
     fun clearCache() {
         cache = null
+    }
+
+    private fun loadPromptConstants(): PromptConstants {
+        promptConsts?.let { return it }
+        val bytes = runtime.readAssetBytes(PROMPT_CONST_ASSET)
+        require(bytes.size == 3072) { "Expected prompt_encode_const.bin to be 3072 bytes, got ${bytes.size}" }
+        val fb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+        val all = FloatArray(768)
+        fb.get(all)
+        return PromptConstants(
+            posmat = all.copyOfRange(0, 256),
+            pointEmbed = all.copyOfRange(256, 512),
+            notAPoint = all.copyOfRange(512, 768)
+        ).also { promptConsts = it }
     }
 
     suspend fun encodeImage(source: Bitmap): Long = withContext(runtime.inferenceDispatcher) {
@@ -54,16 +83,20 @@ class Sam2Runner(private val runtime: LiteRtRuntime) {
         inputBuffers[0].writeFloat(inFloats)
         model.run(inputBuffers, outputBuffers)
 
-        // Store the 3 FPN feature pyramid outputs
-        val out0 = outputBuffers[0].readFloat()
-        val out1 = outputBuffers[1].readFloat()
-        val out2 = outputBuffers[2].readFloat()
+        val outs = outputBuffers.map { it.readFloat() }
+
+        // Match outputs by exact tensor size so encoder output slot ordering never mismatches
+        val imgEmb = outs.firstOrNull { it.size == EMB_SIZE } ?: outs.last()
+        val featS1 = outs.firstOrNull { it.size == FEAT_S1_SIZE }
+            ?: outs.getOrElse(1) { FloatArray(FEAT_S1_SIZE) }.copyOf(FEAT_S1_SIZE)
+        val featS0 = outs.firstOrNull { it.size == FEAT_S0_SIZE }
+            ?: outs.first().copyOf(FEAT_S0_SIZE)
 
         cache = CachedEmbeddings(
             photoHash = source.hashCode(),
-            level0 = out0,
-            level1 = out1,
-            level2 = out2
+            imageEmbeddings = imgEmb,
+            featS1 = featS1,
+            featS0 = featS0
         )
         System.currentTimeMillis() - t0
     }
@@ -78,18 +111,20 @@ class Sam2Runner(private val runtime: LiteRtRuntime) {
         val loaded = runtime.getOrLoad(ModelId.SAM2_DECODER)
         val model = loaded.model
 
-        val sparsePrompt = buildSparsePromptEmbedding(normX, normY, isPositivePoint)
-        val featS0 = sliceOrPassFeature(emb.level0, expectedSize = 32 * 256 * 256)
-        val featS1 = sliceOrPassFeature(emb.level1, expectedSize = 64 * 128 * 128)
+        val sparsePrompt = encodePointPrompt(normX, normY)
 
         val inputBuffers = model.createInputBuffers()
         val outputBuffers = model.createOutputBuffers()
 
-        // Decoder input order: image_embeddings, sparse_prompt, feat_s1, feat_s0
-        inputBuffers[0].writeFloat(emb.level2)
+        // Verified sam2_tiny_mask_decoder_v2_fp16.tflite input order:
+        //   [0] image_embeddings [1,256,64,64]
+        //   [1] sparse_prompt    [1,2,256]
+        //   [2] feat_s1          [1,64,128,128]
+        //   [3] feat_s0          [1,32,256,256]
+        inputBuffers[0].writeFloat(emb.imageEmbeddings)
         inputBuffers[1].writeFloat(sparsePrompt)
-        if (inputBuffers.size > 2) inputBuffers[2].writeFloat(featS1)
-        if (inputBuffers.size > 3) inputBuffers[3].writeFloat(featS0)
+        if (inputBuffers.size > 2) inputBuffers[2].writeFloat(emb.featS1)
+        if (inputBuffers.size > 3) inputBuffers[3].writeFloat(emb.featS0)
 
         model.run(inputBuffers, outputBuffers)
 
@@ -119,6 +154,32 @@ class Sam2Runner(private val runtime: LiteRtRuntime) {
     }
 
     /**
+     * Bit-exact host-side SAM 2.1 point prompt encoder matching `sam2-1-tiny-click-to-segment`:
+     *   a = 2 * ((px + 0.5) / 1024) - 1
+     *   b = 2 * ((py + 0.5) / 1024) - 1
+     *   token0[l]     = sin(2*pi*(a*posmat[l] + b*posmat[128+l])) + pointEmbed[l]
+     *   token0[128+l] = cos(2*pi*(a*posmat[l] + b*posmat[128+l])) + pointEmbed[128+l]
+     *   token1[0..255] = notAPoint[0..255]
+     */
+    private fun encodePointPrompt(normX: Float, normY: Float): FloatArray {
+        val c = loadPromptConstants()
+        val px = normX.coerceIn(0f, 1f) * IMG_SIZE
+        val py = normY.coerceIn(0f, 1f) * IMG_SIZE
+        val a = 2f * ((px + 0.5f) / IMG_SIZE) - 1f
+        val b = 2f * ((py + 0.5f) / IMG_SIZE) - 1f
+
+        val out = FloatArray(512)
+        val twoPi = 2.0 * PI
+        for (l in 0 until 128) {
+            val u = (twoPi * (a * c.posmat[l] + b * c.posmat[128 + l])).toFloat()
+            out[l] = sin(u) + c.pointEmbed[l]
+            out[128 + l] = cos(u) + c.pointEmbed[128 + l]
+        }
+        System.arraycopy(c.notAPoint, 0, out, 256, 256)
+        return out
+    }
+
+    /**
      * Renders a 256x256 SAM foreground boolean mask into a translucent purple overlay
      * merged onto [existingMask] at full photo resolution.
      */
@@ -139,34 +200,5 @@ class Sam2Runner(private val runtime: LiteRtRuntime) {
         canvas.drawBitmap(scaled, 0f, 0f, null)
         scaled.recycle()
         return merged
-    }
-
-    /**
-     * Random Fourier / sinusoidal positional encoding of a single normalized tap point
-     * into SAM 2.1's `sparse_prompt` tensor [1, 2, 256] (token 0 = point, token 1 = pad).
-     * Exact learned Gaussian matrix weights are loaded once verified via `inspect_models.py`.
-     */
-    private fun buildSparsePromptEmbedding(
-        normX: Float,
-        normY: Float,
-        isPositive: Boolean
-    ): FloatArray {
-        val out = FloatArray(2 * 256)
-        val sx = 2f * normX.coerceIn(0f, 1f) - 1f
-        val sy = 2f * normY.coerceIn(0f, 1f) - 1f
-        val labelBias = if (isPositive) 0.5f else -0.5f
-
-        for (i in 0 until 128) {
-            val freq = (i + 1) * 0.25f * PI.toFloat()
-            val angle = sx * freq + sy * freq * 0.73f
-            out[i] = sin(angle) + labelBias
-            out[128 + i] = cos(angle) + labelBias
-        }
-        return out
-    }
-
-    private fun sliceOrPassFeature(src: FloatArray, expectedSize: Int): FloatArray {
-        if (src.size == expectedSize) return src
-        return src.copyOf(expectedSize)
     }
 }
