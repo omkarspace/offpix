@@ -46,8 +46,8 @@ class YuNetDetector(private val runtime: LiteRtRuntime) {
         val model = loaded.model
 
         val lb = letterboxTo640(source)
-        val inFloats = FloatArray(INPUT_SIZE * INPUT_SIZE * 3)
-        packBgr255Nhwc(lb.bitmap640, inFloats)
+        val inFloats = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
+        packBgr255Nchw(lb.bitmap640, inFloats)
 
         val inputBuffers = model.createInputBuffers()
         val outputBuffers = model.createOutputBuffers()
@@ -88,15 +88,16 @@ class YuNetDetector(private val runtime: LiteRtRuntime) {
         return LetterboxResult(canvasBmp, scale, padX, padY)
     }
 
-    private fun packBgr255Nhwc(bmp: Bitmap, out: FloatArray) {
-        val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
+    /** Verified yunet_fp16.tflite input shape: [1, 3, 640, 640] NCHW BGR in [0, 255]. */
+    private fun packBgr255Nchw(bmp: Bitmap, out: FloatArray) {
+        val hw = INPUT_SIZE * INPUT_SIZE
+        val pixels = IntArray(hw)
         bmp.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
-        var j = 0
-        for (p in pixels) {
-            // BGR order in [0, 255]
-            out[j++] = (p and 0xFF).toFloat()
-            out[j++] = ((p shr 8) and 0xFF).toFloat()
-            out[j++] = ((p shr 16) and 0xFF).toFloat()
+        for (i in 0 until hw) {
+            val p = pixels[i]
+            out[i] = (p and 0xFF).toFloat()                 // B plane
+            out[hw + i] = ((p shr 8) and 0xFF).toFloat()    // G plane
+            out[2 * hw + i] = ((p shr 16) and 0xFF).toFloat() // R plane
         }
     }
 
