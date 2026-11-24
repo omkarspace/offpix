@@ -1,6 +1,10 @@
-﻿package com.offpix.app
+package com.offpix.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -51,6 +55,28 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Android 8-9 (API 26-28) requires legacy WRITE_EXTERNAL_STORAGE at save time.
+                // Android 10+ (API 29+) saves via MediaStore with zero storage permissions.
+                val legacyWritePermission = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) vm.saveCurrentPhoto()
+                }
+
+                fun triggerSaveWithPermissionCheck() {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        val hasPerm = ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (!hasPerm) {
+                            legacyWritePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            return
+                        }
+                    }
+                    vm.saveCurrentPhoto()
+                }
+
                 LaunchedEffect(state.toastMessage) {
                     state.toastMessage?.let { msg ->
                         snackbarHostState.showSnackbar(msg)
@@ -75,6 +101,7 @@ class MainActivity : ComponentActivity() {
                                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                     )
                                 },
+                                onOpenRecent = { uri -> vm.onPhotoSelected(uri, StudioTab.UPSCALE) },
                                 onOpenEngineSheet = { vm.setShowEngineSheet(true) }
                             )
 
@@ -104,6 +131,7 @@ class MainActivity : ComponentActivity() {
                                 onBrushStroke = vm::onBrushStroke,
                                 onClearMask = vm::clearMask,
                                 onRunErase = vm::runMagicErase,
+                                onEraseAnother = vm::commitEraseAndContinue,
                                 onCancelProcessing = vm::cancelActiveJob
                             )
                         }
@@ -117,7 +145,7 @@ class MainActivity : ComponentActivity() {
                                 preserveExif = state.preserveExif,
                                 onFormatChange = vm::setExportFormat,
                                 onPreserveExifChange = vm::setPreserveExif,
-                                onConfirmSave = vm::saveCurrentPhoto,
+                                onConfirmSave = { triggerSaveWithPermissionCheck() },
                                 onDismiss = { vm.setShowExportSheet(false) }
                             )
                         }

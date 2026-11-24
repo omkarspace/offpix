@@ -50,6 +50,7 @@ data class StudioUiState(
     val unblurMode: UnblurMode = UnblurMode.QUICK_FIX,
     val unblurStrength: Float = 0.85f,
     val detectedFaces: List<DetectedFaceOverlay> = emptyList(),
+    val noFaceDetected: Boolean = false,
 
     // Tab 3: Magic Eraser
     val eraserTool: EraserTool = EraserTool.TAP_OBJECT,

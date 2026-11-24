@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.offpix.app.io.ExportFormat
 import com.offpix.app.io.PhotoLoader
 import com.offpix.app.io.PhotoSaver
+import com.offpix.app.io.RecentRescuesStore
 import com.offpix.app.ml.LiteRtRuntime
 import com.offpix.app.ml.ModelId
 import com.offpix.app.ml.PhotoRescuePipelines
@@ -33,6 +34,15 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private var activeJob: Job? = null
     private val undoStack = ArrayDeque<Bitmap?>()
     private val redoStack = ArrayDeque<Bitmap?>()
+
+    init {
+        viewModelScope.launch {
+            val saved = RecentRescuesStore.loadAll(getApplication())
+            if (saved.isNotEmpty()) {
+                _uiState.update { it.copy(recentRescues = saved) }
+            }
+        }
+    }
 
     private fun pushUndoSnapshot(currentAfter: Bitmap?) {
         undoStack.addLast(currentAfter)
@@ -199,7 +209,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setUpscaleFactor(factor: Int) = _uiState.update { it.copy(upscaleFactor = factor) }
     fun setUpscaleSharpness(v: Float) = _uiState.update { it.copy(upscaleSharpness = v) }
-    fun setUnblurMode(mode: UnblurMode) = _uiState.update { it.copy(unblurMode = mode) }
+    fun setUnblurMode(mode: UnblurMode) = _uiState.update { it.copy(unblurMode = mode, noFaceDetected = false) }
     fun setUnblurStrength(v: Float) = _uiState.update { it.copy(unblurStrength = v) }
     fun setEraserTool(tool: EraserTool) = _uiState.update { it.copy(eraserTool = tool) }
     fun setBrushSize(px: Float) = _uiState.update { it.copy(brushSizePx = px) }
@@ -268,17 +278,31 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             try {
+                var foundAnyFace = true
                 val out = if (isPortrait) {
                     pipelines.runPortraitRestore(
                         source = src,
                         strength = state.unblurStrength,
-                        onFacesDetected = { faces -> _uiState.update { it.copy(detectedFaces = faces) } },
+                        onFacesDetected = { faces ->
+                            foundAnyFace = faces.isNotEmpty()
+                            _uiState.update { it.copy(detectedFaces = faces, noFaceDetected = faces.isEmpty()) }
+                        },
                         onProgress = { p, sub -> _uiState.update { it.copy(hudProgress = p, hudSub = sub) } }
                     )
                 } else {
                     pipelines.runQuickUnblur(src, state.unblurStrength) { p, sub ->
                         _uiState.update { it.copy(hudProgress = p, hudSub = sub) }
                     }
+                }
+                if (isPortrait && !foundAnyFace) {
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            noFaceDetected = true,
+                            toastMessage = "No face found — try Quick Fix (NAFNet)"
+                        )
+                    }
+                    return@launch
                 }
                 val dt = System.currentTimeMillis() - t0
                 pushUndoSnapshot(state.afterBitmap)
@@ -348,19 +372,25 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun onBrushStroke(normX: Float, normY: Float) {
+    fun onBrushStroke(fromX: Float, fromY: Float, toX: Float, toY: Float) {
         val state = _uiState.value
         val mask = state.maskBitmap ?: return
         val updated = mask.copy(Bitmap.Config.ARGB_8888, true)
-        val cx = normX * updated.width
-        val cy = normY * updated.height
+        val x0 = fromX * updated.width
+        val y0 = fromY * updated.height
+        val x1 = toX * updated.width
+        val y1 = toY * updated.height
         val radius = (state.brushSizePx / 512f) * minOf(updated.width, updated.height)
 
         val canvas = Canvas(updated)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(165, 167, 139, 250)
+            style = Paint.Style.STROKE
+            strokeWidth = radius * 2f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
         }
-        canvas.drawCircle(cx, cy, radius, paint)
+        canvas.drawLine(x0, y0, x1, y1, paint)
 
         _uiState.update {
             it.copy(
@@ -369,6 +399,25 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 maskStatusText = "Brush mask ready"
             )
         }
+    }
+
+    /** Commits the latest erased photo as the new working base so the user can erase more objects. */
+    fun commitEraseAndContinue() {
+        val erased = _uiState.value.afterBitmap ?: return
+        pipelines.sam2Runner.clearCache()
+        val freshMask = Bitmap.createBitmap(erased.width, erased.height, Bitmap.Config.ARGB_8888)
+        _uiState.update {
+            it.copy(
+                beforeBitmap = erased,
+                afterBitmap = null,
+                maskBitmap = freshMask,
+                samEncoded = false,
+                hasMask = false,
+                maskStatusText = "No mask",
+                statusPill = "Ready to erase another object"
+            )
+        }
+        preEncodeSamIfAvailable()
     }
 
     fun clearMask() {
@@ -439,6 +488,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     exifTags = state.exifTags,
                     tagSuffix = state.activeTab.name.lowercase()
                 )
+                RecentRescuesStore.record(getApplication(), uri, state.activeTab.label)
                 val thumb = Bitmap.createScaledBitmap(toSave, 180, 180, true)
                 _uiState.update {
                     it.copy(

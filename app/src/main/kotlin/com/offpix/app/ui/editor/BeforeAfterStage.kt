@@ -77,7 +77,7 @@ fun BeforeAfterStage(
     hudProgress: Float,
     statusPill: String,
     onTapMask: (normX: Float, normY: Float) -> Unit,
-    onBrushStroke: (normX: Float, normY: Float) -> Unit,
+    onBrushStroke: (fromX: Float, fromY: Float, toX: Float, toY: Float) -> Unit,
     onCancelProcessing: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -146,12 +146,23 @@ fun BeforeAfterStage(
                                 )
                             }
                         } else {
-                            detectDragGestures { change, _ ->
+                            var prevNorm: Offset? = null
+                            detectDragGestures(
+                                onDragStart = { start ->
+                                    val nx = (start.x / boxSize.width).coerceIn(0f, 1f)
+                                    val ny = (start.y / boxSize.height).coerceIn(0f, 1f)
+                                    prevNorm = Offset(nx, ny)
+                                    onBrushStroke(nx, ny, nx, ny)
+                                },
+                                onDragEnd = { prevNorm = null },
+                                onDragCancel = { prevNorm = null }
+                            ) { change, _ ->
                                 change.consume()
-                                onBrushStroke(
-                                    (change.position.x / boxSize.width).coerceIn(0f, 1f),
-                                    (change.position.y / boxSize.height).coerceIn(0f, 1f)
-                                )
+                                val nx = (change.position.x / boxSize.width).coerceIn(0f, 1f)
+                                val ny = (change.position.y / boxSize.height).coerceIn(0f, 1f)
+                                val prev = prevNorm ?: Offset(nx, ny)
+                                onBrushStroke(prev.x, prev.y, nx, ny)
+                                prevNorm = Offset(nx, ny)
                             }
                         }
                     } else if (hasAfter && boxSize.width > 0 && zoomScale <= 1.05f) {

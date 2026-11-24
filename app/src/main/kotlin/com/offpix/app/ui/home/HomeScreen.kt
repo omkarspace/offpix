@@ -53,6 +53,7 @@ import com.offpix.app.viewmodel.StudioTab
 fun HomeScreen(
     recentRescues: List<RecentRescue>,
     onPickPhoto: (StudioTab) -> Unit,
+    onOpenRecent: (android.net.Uri) -> Unit,
     onOpenEngineSheet: () -> Unit
 ) {
     Column(
@@ -215,6 +216,7 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(StudioColors.Surface)
                                 .border(1.dp, StudioColors.Border, RoundedCornerShape(12.dp))
+                                .clickable { onOpenRecent(item.uri) }
                         ) {
                             Image(
                                 bitmap = item.thumbnail.asImageBitmap(),

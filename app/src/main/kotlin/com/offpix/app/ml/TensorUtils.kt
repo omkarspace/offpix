@@ -127,6 +127,52 @@ object TensorUtils {
         }
     }
 
+    /**
+     * Separable box dilation of the alpha mask by [radiusPx] pixels before MI-GAN inpainting
+     * so object fringes and cast shadows are cleanly covered without leaving halos.
+     */
+    fun dilateMaskBitmap(mask: Bitmap, radiusPx: Int = 6): Bitmap {
+        if (radiusPx <= 0) return mask.copy(Bitmap.Config.ARGB_8888, false)
+        val w = mask.width
+        val h = mask.height
+        val src = IntArray(w * h)
+        mask.getPixels(src, 0, w, 0, 0, w, h)
+
+        val alphaSrc = IntArray(w * h) { Color.alpha(src[it]) }
+        val horiz = IntArray(w * h)
+        val out = IntArray(w * h)
+
+        // Horizontal max-filter pass
+        for (y in 0 until h) {
+            val row = y * w
+            for (x in 0 until w) {
+                var maxA = 0
+                val x0 = maxOf(0, x - radiusPx)
+                val x1 = minOf(w - 1, x + radiusPx)
+                for (kx in x0..x1) {
+                    val a = alphaSrc[row + kx]
+                    if (a > maxA) maxA = a
+                }
+                horiz[row + x] = maxA
+            }
+        }
+
+        // Vertical max-filter pass
+        for (y in 0 until h) {
+            val y0 = maxOf(0, y - radiusPx)
+            val y1 = minOf(h - 1, y + radiusPx)
+            for (x in 0 until w) {
+                var maxA = 0
+                for (ky in y0..y1) {
+                    val a = horiz[ky * w + x]
+                    if (a > maxA) maxA = a
+                }
+                out[y * w + x] = if (maxA > 30) Color.argb(maxA, 167, 139, 250) else Color.TRANSPARENT
+            }
+        }
+        return Bitmap.createBitmap(out, w, h, Bitmap.Config.ARGB_8888)
+    }
+
     /** Blends [enhanced] over [base] using [alpha] in [0, 1] (for Sharpness / Strength sliders). */
     fun blendBitmaps(base: Bitmap, enhanced: Bitmap, alpha: Float): Bitmap {
         if (alpha >= 0.99f) return enhanced

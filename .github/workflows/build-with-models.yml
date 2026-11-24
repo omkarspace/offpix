@@ -1,0 +1,63 @@
+name: Build Full Model-Bundled APK & Inspect Tensors
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_gfpgan:
+        description: "Include 431 MB pre-built GFPGAN FP16 (larger test APK)"
+        required: false
+        default: "false"
+        type: string
+
+jobs:
+  build-with-models:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download open-source LiteRT models from Hugging Face
+        run: |
+          if [ "${{ github.event.inputs.include_gfpgan }}" = "true" ]; then
+            python scripts/fetch_models.py --include-gfpgan
+          else
+            python scripts/fetch_models.py
+          fi
+
+      - name: Inspect exact .tflite input/output tensor contracts
+        run: |
+          pip install --quiet ai-edge-litert
+          python scripts/inspect_models.py
+
+      - name: Copy models into app assets for direct sideload test APK
+        run: |
+          mkdir -p app/src/main/assets/models
+          cp pack_models/src/main/assets/models/*.tflite app/src/main/assets/models/
+          ls -lh app/src/main/assets/models/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Build Full Model-Bundled Debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload Model-Bundled APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpix-models-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7

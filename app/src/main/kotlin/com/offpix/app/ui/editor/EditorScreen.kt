@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ui.editor
+package com.offpix.app.ui.editor
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,9 +68,10 @@ fun EditorScreen(
     onEraserToolChange: (EraserTool) -> Unit,
     onBrushSizeChange: (Float) -> Unit,
     onTapMask: (Float, Float) -> Unit,
-    onBrushStroke: (Float, Float) -> Unit,
+    onBrushStroke: (Float, Float, Float, Float) -> Unit,
     onClearMask: () -> Unit,
     onRunErase: () -> Unit,
+    onEraseAnother: () -> Unit,
     onCancelProcessing: () -> Unit
 ) {
     Column(
@@ -197,6 +198,27 @@ fun EditorScreen(
                         tint = StudioColors.Sky,
                         onValueChange = onUnblurStrengthChange
                     )
+                    if (state.noFaceDetected && state.unblurMode == UnblurMode.PORTRAIT_RESTORE) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(StudioColors.Sky.copy(alpha = 0.12f))
+                                .border(1.dp, StudioColors.Sky.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("No face detected in photo", color = StudioColors.TextPrimary, fontSize = 11.5.sp)
+                            Text(
+                                "Use Quick Fix →",
+                                color = StudioColors.Sky,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { onUnblurModeChange(UnblurMode.QUICK_FIX) }
+                            )
+                        }
+                    }
                     Button(
                         onClick = onRunUnblur,
                         enabled = !state.isProcessing,
@@ -245,25 +267,39 @@ fun EditorScreen(
                             onValueChange = onBrushSizeChange
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = onClearMask,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(44.dp)
-                        ) {
-                            Text("Clear", color = StudioColors.TextPrimary, fontWeight = FontWeight.Bold)
-                        }
+                    if (state.afterBitmap != null) {
                         Button(
-                            onClick = onRunErase,
-                            enabled = state.hasMask && !state.isProcessing,
-                            modifier = Modifier.weight(1f).height(44.dp),
+                            onClick = onEraseAnother,
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = StudioColors.Purple,
                                 contentColor = StudioColors.OnPurple
                             )
                         ) {
-                            Text("Erase Selection (MI-GAN)", fontWeight = FontWeight.ExtraBold)
+                            Text("Erase Another Object", fontWeight = FontWeight.ExtraBold)
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = onClearMask,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(44.dp)
+                            ) {
+                                Text("Clear", color = StudioColors.TextPrimary, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = onRunErase,
+                                enabled = state.hasMask && !state.isProcessing,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = StudioColors.Purple,
+                                    contentColor = StudioColors.OnPurple
+                                )
+                            ) {
+                                Text("Erase Selection (MI-GAN)", fontWeight = FontWeight.ExtraBold)
+                            }
                         }
                     }
                 }

@@ -161,7 +161,9 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
             mask, cropRect.left, cropRect.top, cropRect.width(), cropRect.height()
         )
         val rgb512 = Bitmap.createScaledBitmap(rgbCrop, 512, 512, true)
-        val mask512 = Bitmap.createScaledBitmap(maskCrop, 512, 512, true)
+        val mask512Raw = Bitmap.createScaledBitmap(maskCrop, 512, 512, true)
+        val mask512 = TensorUtils.dilateMaskBitmap(mask512Raw, radiusPx = 6)
+        mask512Raw.recycle()
 
         onProgress(0.55f, "Running MI-GAN 512 Places2 on GPU...")
         val migan = runtime.getOrLoad(ModelId.MIGAN).model

@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ml
+package com.offpix.app.ml
 
 import android.content.Context
 import com.google.ai.edge.litert.Accelerator
