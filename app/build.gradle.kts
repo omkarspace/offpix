@@ -39,6 +39,8 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // litert-api:2.3.0 ships with Kotlin 2.4.0 metadata
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
 
     buildFeatures {

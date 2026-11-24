@@ -76,6 +76,7 @@ class LiteRtRuntime(private val appContext: Context) : Closeable {
                     Accelerator.NPU -> "NPU"
                     Accelerator.GPU -> "GPU (ML Drift)"
                     Accelerator.CPU -> "CPU (XNNPACK)"
+                    else -> "CPU (XNNPACK)"
                 }
                 return@withContext entry
             } catch (t: Throwable) {
