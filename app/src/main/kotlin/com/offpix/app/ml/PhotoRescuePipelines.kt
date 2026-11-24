@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ml
+package com.offpix.app.ml
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -15,6 +15,9 @@ import kotlinx.coroutines.withContext
  * LiteRtRuntime.inferenceDispatcher.
  */
 class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
+
+    private val yuNetDetector = YuNetDetector(runtime)
+    val sam2Runner = Sam2Runner(runtime)
 
     /** Tab 1: Real-ESRGAN General x4v3 (NHWC [1,128,128,3] -> NCHW [1,3,512,512]). */
     suspend fun runUpscale(
@@ -37,7 +40,7 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
             overlapIn = 16,
             scale = 4,
             onProgress = { done, total ->
-                onProgress(done.toFloat() / total, "Tile $done/$total â€¢ 128Ã—128 â†’ 512Ã—512")
+                onProgress(done.toFloat() / total, "Tile $done/$total • 128×128 → 512×512")
             }
         ) { tile ->
             TensorUtils.bitmapToNhwcRgb01(tile, inFloats)
@@ -78,7 +81,7 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
             overlapIn = 32,
             scale = 1,
             onProgress = { done, total ->
-                onProgress(done.toFloat() / total, "NAFNet tile $done/$total â€¢ 256Ã—256")
+                onProgress(done.toFloat() / total, "NAFNet tile $done/$total • 256×256")
             }
         ) { tile ->
             TensorUtils.bitmapToNchwRgb01(tile, inFloats)
@@ -102,7 +105,7 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
     ): Bitmap = withContext(runtime.inferenceDispatcher) {
         runtime.releaseAllExcept(setOf(ModelId.YUNET, ModelId.GFPGAN))
 
-        onProgress(0.15f, "Detecting faces with YuNet (640Ã—640 BGR)...")
+        onProgress(0.15f, "Detecting faces with YuNet (640×640 BGR)...")
         val faces = detectFacesWithYuNet(source)
         onFacesDetected(faces)
         if (faces.isEmpty()) return@withContext source
@@ -147,7 +150,7 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
     ): Bitmap = withContext(runtime.inferenceDispatcher) {
         runtime.releaseAllExcept(setOf(ModelId.SAM2_ENCODER, ModelId.SAM2_DECODER, ModelId.MIGAN))
 
-        onProgress(0.2f, "Computing 2Ã— context crop around mask...")
+        onProgress(0.2f, "Computing 2× context crop around mask...")
         val cropRect = computeContextCropRect(mask, source.width, source.height)
             ?: return@withContext source
 
@@ -202,25 +205,11 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
     }
 
     /**
-     * YuNet face detector entry point.
-     * Note: Exact multi-stride output tensor indices are finalized after running
-     * `python scripts/inspect_models.py` on the downloaded `yunet_fp16.tflite`.
+     * Runs real OpenCV Zoo / litert-community YuNet face + 5-landmark detection
+     * (`640x640` letterboxed BGR `[0, 255]`, multi-stride 8/16/32 + NMS).
      */
     private suspend fun detectFacesWithYuNet(source: Bitmap): List<DetectedFaceOverlay> {
-        runtime.getOrLoad(ModelId.YUNET)
-        // Fallback center-portrait box when testing before YuNet stride decoder calibration
-        val cx = source.width * 0.5f
-        val cy = source.height * 0.45f
-        val size = minOf(source.width, source.height) * 0.42f
-        val box = RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
-        val landmarks = listOf(
-            cx - size * 0.18f to cy - size * 0.08f,
-            cx + size * 0.18f to cy - size * 0.08f,
-            cx to cy + size * 0.06f,
-            cx - size * 0.14f to cy + size * 0.22f,
-            cx + size * 0.14f to cy + size * 0.22f
-        )
-        return listOf(DetectedFaceOverlay(box, landmarks, 0.99f))
+        return yuNetDetector.detect(source)
     }
 
     private fun computeContextCropRect(mask: Bitmap, imgW: Int, imgH: Int): Rect? {

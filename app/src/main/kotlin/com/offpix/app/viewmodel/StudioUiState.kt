@@ -1,4 +1,4 @@
-﻿package com.offpix.app.viewmodel
+package com.offpix.app.viewmodel
 
 import android.graphics.Bitmap
 import android.graphics.RectF
@@ -62,7 +62,7 @@ data class StudioUiState(
     val hudSub: String = "",
     val hudProgress: Float = 0f,
     val activeAccelerator: String = "GPU (ML Drift)",
-    val statusPill: String = "100% Offline â€¢ Ready",
+    val statusPill: String = "100% Offline • Ready",
     val afterBadgeLabel: String = "AFTER",
 
     // Sheets & Feedback

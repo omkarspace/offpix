@@ -12,6 +12,7 @@ import com.offpix.app.io.ExportFormat
 import com.offpix.app.io.PhotoLoader
 import com.offpix.app.io.PhotoSaver
 import com.offpix.app.ml.LiteRtRuntime
+import com.offpix.app.ml.ModelId
 import com.offpix.app.ml.PhotoRescuePipelines
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -33,8 +34,16 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onPhotoSelected(uri: Uri, initialTab: StudioTab) {
         activeJob?.cancel()
+        pipelines.sam2Runner.clearCache()
         activeJob = viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, hudTitle = "Loading Photo...", hudSub = "Reading EXIF orientation", hudProgress = 0.3f) }
+            _uiState.update {
+                it.copy(
+                    isProcessing = true,
+                    hudTitle = "Loading Photo...",
+                    hudSub = "Reading EXIF orientation",
+                    hudProgress = 0.3f
+                )
+            }
             try {
                 val maxEdge = PhotoLoader.maxUpscaleInputEdge(getApplication())
                 val loaded = PhotoLoader.loadUpright(getApplication(), uri, maxEdge = maxEdge)
@@ -50,11 +59,15 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                         sourceUri = loaded.sourceUri,
                         exifTags = loaded.exifTags,
                         detectedFaces = emptyList(),
+                        samEncoded = false,
                         hasMask = false,
                         maskStatusText = "No mask",
                         isProcessing = false,
-                        statusPill = "${runtime.activeAcceleratorLabel} Ready â€¢ ${loaded.bitmap.width}Ã—${loaded.bitmap.height}"
+                        statusPill = "${runtime.activeAcceleratorLabel} Ready • ${loaded.bitmap.width}×${loaded.bitmap.height}"
                     )
+                }
+                if (initialTab == StudioTab.ERASER) {
+                    preEncodeSamIfAvailable()
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -65,6 +78,9 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun selectTab(tab: StudioTab) {
         activeJob?.cancel()
+        if (tab != StudioTab.ERASER) {
+            pipelines.sam2Runner.clearCache()
+        }
         viewModelScope.launch {
             // Free previous tab's GPU/RAM allocation immediately for 4 GB device safety
             runtime.releaseAllExcept(emptySet())
@@ -73,24 +89,66 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             it.copy(
                 activeTab = tab,
                 detectedFaces = emptyList(),
-                statusPill = "${runtime.activeAcceleratorLabel} Ready â€¢ Offline"
+                samEncoded = false,
+                statusPill = "${runtime.activeAcceleratorLabel} Ready • Offline"
             )
+        }
+        if (tab == StudioTab.ERASER) {
+            preEncodeSamIfAvailable()
+        }
+    }
+
+    private fun preEncodeSamIfAvailable() {
+        val workingBitmap = _uiState.value.afterBitmap ?: _uiState.value.beforeBitmap ?: return
+        if (pipelines.sam2Runner.isEncodedFor(workingBitmap)) {
+            _uiState.update { it.copy(samEncoded = true, statusPill = "SAM 2.1 Ready • Tap any object") }
+            return
+        }
+        if (!runtime.isModelAssetPresent(ModelId.SAM2_ENCODER)) return
+
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isProcessing = true,
+                    hudTitle = "SAM 2.1 Image Encoder (1×)",
+                    hudSub = "Caching 1024×1024 FPN embeddings...",
+                    hudProgress = 0.45f
+                )
+            }
+            try {
+                val ms = pipelines.sam2Runner.encodeImage(workingBitmap)
+                _uiState.update {
+                    it.copy(
+                        isProcessing = false,
+                        samEncoded = true,
+                        activeAccelerator = runtime.activeAcceleratorLabel,
+                        statusPill = "SAM 2.1 Ready (${ms} ms) • Tap any object"
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.update { it.copy(isProcessing = false, samEncoded = false, toastMessage = e.message) }
+            }
         }
     }
 
     fun backToHome() {
         activeJob?.cancel()
+        pipelines.sam2Runner.clearCache()
         viewModelScope.launch { runtime.releaseAllExcept(emptySet()) }
         _uiState.update { it.copy(screen = StudioScreen.HOME, isProcessing = false) }
     }
 
     fun resetCurrentEdit() {
         val before = _uiState.value.beforeBitmap ?: return
+        pipelines.sam2Runner.clearCache()
         val freshMask = Bitmap.createBitmap(before.width, before.height, Bitmap.Config.ARGB_8888)
         _uiState.update {
             it.copy(
                 afterBitmap = null,
                 maskBitmap = freshMask,
+                samEncoded = false,
                 hasMask = false,
                 maskStatusText = "No mask",
                 detectedFaces = emptyList(),
@@ -141,7 +199,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                         afterBitmap = out,
                         afterBadgeLabel = "${state.upscaleFactor}x HD",
                         activeAccelerator = runtime.activeAcceleratorLabel,
-                        statusPill = "Done in ${dt} ms â€¢ ${runtime.activeAcceleratorLabel} â€¢ ${out.width}Ã—${out.height}"
+                        statusPill = "Done in ${dt} ms • ${runtime.activeAcceleratorLabel} • ${out.width}×${out.height}"
                     )
                 }
             } catch (e: Exception) {
@@ -186,7 +244,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                         afterBitmap = out,
                         afterBadgeLabel = if (isPortrait) "FACE RESTORED" else "UNBLURRED",
                         activeAccelerator = runtime.activeAcceleratorLabel,
-                        statusPill = "Done in ${dt} ms â€¢ ${runtime.activeAcceleratorLabel}"
+                        statusPill = "Done in ${dt} ms • ${runtime.activeAcceleratorLabel}"
                     )
                 }
             } catch (e: Exception) {
@@ -199,6 +257,30 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     fun onTapSelectObject(normX: Float, normY: Float) {
         val state = _uiState.value
         val mask = state.maskBitmap ?: return
+        val workingBitmap = state.afterBitmap ?: state.beforeBitmap ?: return
+
+        if (pipelines.sam2Runner.isEncodedFor(workingBitmap)) {
+            activeJob?.cancel()
+            activeJob = viewModelScope.launch {
+                try {
+                    val res = pipelines.sam2Runner.decodeTap(normX, normY, isPositivePoint = true)
+                    val merged = pipelines.sam2Runner.mergeMaskIntoBitmap(res.mask256, mask)
+                    _uiState.update {
+                        it.copy(
+                            maskBitmap = merged,
+                            hasMask = true,
+                            maskStatusText = "IoU ${"%.2f".format(res.bestIoU)} • ${res.elapsedMs} ms",
+                            statusPill = "SAM 2.1 Selected (${res.elapsedMs} ms) • Tap Erase"
+                        )
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    _uiState.update { it.copy(toastMessage = e.message ?: "SAM 2.1 decode failed") }
+                }
+            }
+            return
+        }
+
         val updated = mask.copy(Bitmap.Config.ARGB_8888, true)
         val cx = normX * updated.width
         val cy = normY * updated.height
@@ -214,8 +296,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             it.copy(
                 maskBitmap = updated,
                 hasMask = true,
-                maskStatusText = "Object masked",
-                statusPill = "SAM 2.1 Mask Ready â€¢ Tap Erase"
+                maskStatusText = "Region masked",
+                statusPill = "Mask Ready • Tap Erase"
             )
         }
     }
@@ -256,7 +338,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun runMagicErase() {
         val state = _uiState.value
-        val src = state.beforeBitmap ?: return
+        // Support iterative erasing on the latest erased photo
+        val src = state.afterBitmap ?: state.beforeBitmap ?: return
         val mask = state.maskBitmap ?: return
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
@@ -274,13 +357,17 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.update { it.copy(hudProgress = p, hudSub = sub) }
                 }
                 val dt = System.currentTimeMillis() - t0
+                val freshMask = Bitmap.createBitmap(out.width, out.height, Bitmap.Config.ARGB_8888)
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
                         afterBitmap = out,
+                        maskBitmap = freshMask,
+                        hasMask = false,
+                        maskStatusText = "Erased!",
                         afterBadgeLabel = "ERASED",
                         activeAccelerator = runtime.activeAcceleratorLabel,
-                        statusPill = "MI-GAN Erased in ${dt} ms â€¢ ${runtime.activeAcceleratorLabel}"
+                        statusPill = "MI-GAN Erased in ${dt} ms • ${runtime.activeAcceleratorLabel}"
                     )
                 }
             } catch (e: Exception) {
@@ -318,6 +405,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        pipelines.sam2Runner.clearCache()
         runtime.close()
         super.onCleared()
     }

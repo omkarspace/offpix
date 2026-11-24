@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ui.home
+package com.offpix.app.ui.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -132,7 +132,7 @@ fun HomeScreen(
                     Icon(Icons.Rounded.Lock, null, tint = StudioColors.Mint, modifier = Modifier.size(13.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "100% On-Device â€¢ Zero Cloud â€¢ Zero Ads",
+                        "100% On-Device • Zero Cloud • Zero Ads",
                         color = StudioColors.Mint,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold

@@ -1,0 +1,40 @@
+OffPix — Third-Party Open-Source Model & Library Licenses
+=========================================================
+
+All AI models bundled in OffPix are commercial-safe open-source models running
+100% locally on-device via Google LiteRT.
+
+1. Real-ESRGAN General x4v3 (realesr-general-x4v3)
+   License: BSD-3-Clause
+   Upstream: https://github.com/xinntao/Real-ESRGAN
+   LiteRT Port: https://huggingface.co/litert-community/real-esrgan-x4v3-litert
+
+2. NAFNet-GoPro-width32
+   License: MIT License
+   Upstream: https://github.com/megvii-research/NAFNet
+   LiteRT Port: https://huggingface.co/litert-community/NAFNet-GoPro-width32-LiteRT
+
+3. YuNet Face Detector (OpenCV Zoo / libfacedetection)
+   License: MIT License
+   Upstream: https://github.com/opencv/opencv_zoo
+   LiteRT Port: https://huggingface.co/litert-community/YuNet-Face-LiteRT
+
+4. GFPGAN v1.4
+   License: Apache License 2.0
+   Upstream: https://github.com/TencentARC/GFPGAN
+
+5. SAM 2.1 Hiera-Tiny (Image Encoder & Mask Decoder)
+   License: Apache License 2.0
+   Upstream: https://github.com/facebookresearch/sam2
+   LiteRT Ports:
+     - https://huggingface.co/litert-community/SAM2.1-Hiera-Tiny-Image-Encoder
+     - https://huggingface.co/litert-community/SAM2.1-Hiera-Tiny-Mask-Decoder
+
+6. MI-GAN 512 Places2 (Code & Model Weights / LICENSE-WEIGHTS)
+   License: MIT License
+   Upstream: https://github.com/Picsart-AI-Research/MI-GAN
+   LiteRT Port: https://huggingface.co/litert-community/MI-GAN-512-Places2-LiteRT
+
+7. Google LiteRT (com.google.ai.edge.litert)
+   License: Apache License 2.0
+   Upstream: https://github.com/google-ai-edge/LiteRT

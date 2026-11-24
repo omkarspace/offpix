@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ui.sheets
+package com.offpix.app.ui.sheets
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,7 +66,7 @@ fun ExportBottomSheet(
             ) {
                 Column {
                     Text("Output Resolution", color = StudioColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    Text("$width Ã— $height px â€¢ Ready Offline", color = StudioColors.TextSecondary, fontSize = 11.5.sp)
+                    Text("$width × $height px • Ready Offline", color = StudioColors.TextSecondary, fontSize = 11.5.sp)
                 }
                 Text(
                     "0 Watermarks",
@@ -163,11 +163,11 @@ fun EngineLicensesSheet(
     onDismiss: () -> Unit
 ) {
     val models = listOf(
-        Triple("Real-ESRGAN General x4v3", "3.5 MB â€¢ FP16 â€¢ 4x Super-Resolution", "BSD-3"),
-        Triple("NAFNet-GoPro-width32", "38.3 MB â€¢ FP16 â€¢ Motion Deblur", "MIT"),
-        Triple("YuNet + GFPGAN v1.4", "0.3 MB + Quantized â€¢ Face Align & Restore", "MIT / Apache 2.0"),
-        Triple("SAM 2.1 Hiera-Tiny (Enc + Dec)", "80 MB + 17 MB â€¢ Tap-to-Select Mask", "Apache 2.0"),
-        Triple("MI-GAN 512 Places2", "16.3 MB â€¢ FP16 â€¢ Object Inpainting", "MIT")
+        Triple("Real-ESRGAN General x4v3", "3.5 MB • FP16 • 4x Super-Resolution", "BSD-3"),
+        Triple("NAFNet-GoPro-width32", "38.3 MB • FP16 • Motion Deblur", "MIT"),
+        Triple("YuNet + GFPGAN v1.4", "0.3 MB + Quantized • Face Align & Restore", "MIT / Apache 2.0"),
+        Triple("SAM 2.1 Hiera-Tiny (Enc + Dec)", "80 MB + 17 MB • Tap-to-Select Mask", "Apache 2.0"),
+        Triple("MI-GAN 512 Places2", "16.3 MB • FP16 • Object Inpainting", "MIT")
     )
 
     ModalBottomSheet(
@@ -194,8 +194,8 @@ fun EngineLicensesSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("LiteRT CompiledModel â€¢ $activeAccelerator", color = StudioColors.Mint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Priority: NPU â†’ GPU (ML Drift) â†’ CPU (XNNPACK)", color = StudioColors.TextSecondary, fontSize = 11.sp)
+                    Text("LiteRT CompiledModel • $activeAccelerator", color = StudioColors.Mint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Priority: NPU → GPU (ML Drift) → CPU (XNNPACK)", color = StudioColors.TextSecondary, fontSize = 11.sp)
                 }
                 Text("0 KB Sent", color = StudioColors.Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }

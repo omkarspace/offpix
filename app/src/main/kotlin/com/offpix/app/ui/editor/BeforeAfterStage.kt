@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ui.editor
+package com.offpix.app.ui.editor
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
@@ -212,7 +212,7 @@ fun BeforeAfterStage(
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("â‡„", color = StudioColors.Bg, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                    Text("⇄", color = StudioColors.Bg, fontWeight = FontWeight.Black, fontSize = 14.sp)
                 }
             }
 

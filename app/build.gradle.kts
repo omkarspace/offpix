@@ -80,4 +80,5 @@ dependencies {
     implementation(libs.litert.gpu)
 
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation(libs.junit)
 }
