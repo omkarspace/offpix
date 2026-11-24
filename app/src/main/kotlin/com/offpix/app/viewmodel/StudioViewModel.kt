@@ -1,4 +1,4 @@
-﻿package com.offpix.app.viewmodel
+package com.offpix.app.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
@@ -31,10 +31,50 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<StudioUiState> = _uiState.asStateFlow()
 
     private var activeJob: Job? = null
+    private val undoStack = ArrayDeque<Bitmap?>()
+    private val redoStack = ArrayDeque<Bitmap?>()
+
+    private fun pushUndoSnapshot(currentAfter: Bitmap?) {
+        undoStack.addLast(currentAfter)
+        if (undoStack.size > 6) undoStack.removeFirst()
+        redoStack.clear()
+    }
+
+    fun undoEdit() {
+        if (undoStack.isEmpty()) return
+        val current = _uiState.value.afterBitmap
+        redoStack.addLast(current)
+        val previous = undoStack.removeLast()
+        _uiState.update {
+            it.copy(
+                afterBitmap = previous,
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty(),
+                toastMessage = if (previous == null) "Back to original" else "Undid last edit"
+            )
+        }
+    }
+
+    fun redoEdit() {
+        if (redoStack.isEmpty()) return
+        val current = _uiState.value.afterBitmap
+        undoStack.addLast(current)
+        val next = redoStack.removeLast()
+        _uiState.update {
+            it.copy(
+                afterBitmap = next,
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty(),
+                toastMessage = "Redid edit"
+            )
+        }
+    }
 
     fun onPhotoSelected(uri: Uri, initialTab: StudioTab) {
         activeJob?.cancel()
         pipelines.sam2Runner.clearCache()
+        undoStack.clear()
+        redoStack.clear()
         activeJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -193,10 +233,13 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.update { it.copy(hudProgress = p, hudSub = sub) }
                 }
                 val dt = System.currentTimeMillis() - t0
+                pushUndoSnapshot(state.afterBitmap)
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
                         afterBitmap = out,
+                        canUndo = undoStack.isNotEmpty(),
+                        canRedo = redoStack.isNotEmpty(),
                         afterBadgeLabel = "${state.upscaleFactor}x HD",
                         activeAccelerator = runtime.activeAcceleratorLabel,
                         statusPill = "Done in ${dt} ms • ${runtime.activeAcceleratorLabel} • ${out.width}×${out.height}"
@@ -238,10 +281,13 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 val dt = System.currentTimeMillis() - t0
+                pushUndoSnapshot(state.afterBitmap)
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
                         afterBitmap = out,
+                        canUndo = undoStack.isNotEmpty(),
+                        canRedo = redoStack.isNotEmpty(),
                         afterBadgeLabel = if (isPortrait) "FACE RESTORED" else "UNBLURRED",
                         activeAccelerator = runtime.activeAcceleratorLabel,
                         statusPill = "Done in ${dt} ms • ${runtime.activeAcceleratorLabel}"
@@ -358,10 +404,13 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 val dt = System.currentTimeMillis() - t0
                 val freshMask = Bitmap.createBitmap(out.width, out.height, Bitmap.Config.ARGB_8888)
+                pushUndoSnapshot(state.afterBitmap)
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
                         afterBitmap = out,
+                        canUndo = undoStack.isNotEmpty(),
+                        canRedo = redoStack.isNotEmpty(),
                         maskBitmap = freshMask,
                         hasMask = false,
                         maskStatusText = "Erased!",

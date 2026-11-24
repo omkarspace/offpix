@@ -21,6 +21,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -234,7 +236,44 @@ fun EngineLicensesSheet(
                 fontSize = 11.sp,
                 lineHeight = 16.sp
             )
+
+            FullLicenseNoticeBox()
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun FullLicenseNoticeBox() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val fullText = androidx.compose.runtime.remember(expanded) {
+        if (!expanded) "" else runCatching {
+            context.assets.open("licenses/THIRD_PARTY_LICENSES.txt").bufferedReader().use { it.readText() }
+        }.getOrDefault("License file unavailable.")
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = if (expanded) "Hide Full License Notices ▲" else "View Full Open-Source License Notices ▼",
+            color = StudioColors.Sky,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable { expanded = !expanded }
+        )
+        if (expanded) {
+            Text(
+                text = fullText,
+                color = StudioColors.TextSecondary,
+                fontSize = 10.5.sp,
+                lineHeight = 15.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(StudioColors.Bg)
+                    .border(1.dp, StudioColors.Border, RoundedCornerShape(10.dp))
+                    .padding(10.dp)
+            )
         }
     }
 }

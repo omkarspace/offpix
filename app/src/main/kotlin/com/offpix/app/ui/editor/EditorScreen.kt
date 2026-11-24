@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Redo
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.Bolt
@@ -53,7 +54,8 @@ fun EditorScreen(
     state: StudioUiState,
     onBackHome: () -> Unit,
     onPickAnotherPhoto: () -> Unit,
-    onResetEdit: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onOpenEngineSheet: () -> Unit,
     onOpenExportSheet: () -> Unit,
     onSelectTab: (StudioTab) -> Unit,
@@ -90,9 +92,15 @@ fun EditorScreen(
                 TopIconBtn(Icons.Rounded.PhotoLibrary, "Pick Photo", onClick = onPickAnotherPhoto)
                 TopIconBtn(
                     Icons.AutoMirrored.Rounded.Undo,
-                    "Reset Edit",
-                    enabled = state.afterBitmap != null,
-                    onClick = onResetEdit
+                    "Undo",
+                    enabled = state.canUndo,
+                    onClick = onUndo
+                )
+                TopIconBtn(
+                    Icons.AutoMirrored.Rounded.Redo,
+                    "Redo",
+                    enabled = state.canRedo,
+                    onClick = onRedo
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

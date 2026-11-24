@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                     )
                                 },
-                                onResetEdit = vm::resetCurrentEdit,
+                                onUndo = vm::undoEdit,
+                                onRedo = vm::redoEdit,
                                 onOpenEngineSheet = { vm.setShowEngineSheet(true) },
                                 onOpenExportSheet = { vm.setShowExportSheet(true) },
                                 onSelectTab = vm::selectTab,

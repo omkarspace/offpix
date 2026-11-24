@@ -37,6 +37,8 @@ data class StudioUiState(
     val beforeBitmap: Bitmap? = null,
     val afterBitmap: Bitmap? = null,
     val maskBitmap: Bitmap? = null,
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
     val sourceUri: Uri? = null,
     val exifTags: Map<String, String> = emptyMap(),
 

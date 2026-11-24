@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -77,7 +82,11 @@ fun BeforeAfterStage(
     modifier: Modifier = Modifier
 ) {
     var splitFraction by remember(afterBitmap) { mutableFloatStateOf(0.5f) }
+    var zoomScale by remember(beforeBitmap) { mutableFloatStateOf(1f) }
+    var panOffset by remember(beforeBitmap) { mutableStateOf(Offset.Zero) }
+    var holdingOriginal by remember { mutableStateOf(false) }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
+
     val hasAfter = afterBitmap != null
     val aspect = if (beforeBitmap != null && beforeBitmap.height > 0) {
         (beforeBitmap.width.toFloat() / beforeBitmap.height.toFloat()).coerceIn(0.6f, 1.6f)
@@ -97,6 +106,36 @@ fun BeforeAfterStage(
                 .background(Color(0xFF10141D))
                 .border(1.dp, StudioColors.Border, RoundedCornerShape(16.dp))
                 .onSizeChanged { boxSize = it }
+                // Double-tap resets zoom (when not in Magic Eraser tap mode)
+                .pointerInput(activeTab, hasAfter) {
+                    if (activeTab != StudioTab.ERASER || hasAfter) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                zoomScale = if (zoomScale > 1.05f) 1f else 2.25f
+                                panOffset = Offset.Zero
+                            }
+                        )
+                    }
+                }
+                // Pinch-to-zoom (1x - 4x) when inspecting upscaled/restored details
+                .pointerInput(activeTab, hasAfter, boxSize) {
+                    if (activeTab != StudioTab.ERASER || hasAfter) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (zoomScale * zoom).coerceIn(1f, 4f)
+                            zoomScale = newScale
+                            if (newScale > 1f) {
+                                val maxX = (boxSize.width * (newScale - 1f)) / 2f
+                                val maxY = (boxSize.height * (newScale - 1f)) / 2f
+                                panOffset = Offset(
+                                    (panOffset.x + pan.x).coerceIn(-maxX, maxX),
+                                    (panOffset.y + pan.y).coerceIn(-maxY, maxY)
+                                )
+                            } else {
+                                panOffset = Offset.Zero
+                            }
+                        }
+                    }
+                }
                 .pointerInput(activeTab, eraserTool, hasAfter, boxSize) {
                     if (activeTab == StudioTab.ERASER && !hasAfter && boxSize.width > 0 && boxSize.height > 0) {
                         if (eraserTool == EraserTool.TAP_OBJECT) {
@@ -115,7 +154,7 @@ fun BeforeAfterStage(
                                 )
                             }
                         }
-                    } else if (hasAfter && boxSize.width > 0) {
+                    } else if (hasAfter && boxSize.width > 0 && zoomScale <= 1.05f) {
                         detectDragGestures { change, _ ->
                             change.consume()
                             splitFraction = (change.position.x / boxSize.width).coerceIn(0.04f, 0.96f)
@@ -123,97 +162,146 @@ fun BeforeAfterStage(
                     }
                 }
         ) {
-            // Base: BEFORE image
-            if (beforeBitmap != null) {
-                Image(
-                    bitmap = beforeBitmap.asImageBitmap(),
-                    contentDescription = "Before",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // Clipped: AFTER image (right side of divider)
-            if (afterBitmap != null && boxSize.width > 0) {
-                val clipWidthDp = with(LocalDensity.current) {
-                    (boxSize.width * (1f - splitFraction)).toDp()
+            val zoomModifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = zoomScale
+                    scaleY = zoomScale
+                    translationX = panOffset.x
+                    translationY = panOffset.y
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(clipWidthDp)
-                        .fillMaxHeight()
-                        .clipToBounds()
-                ) {
+
+            Box(modifier = zoomModifier) {
+                // Base: BEFORE image
+                if (beforeBitmap != null) {
                     Image(
-                        bitmap = afterBitmap.asImageBitmap(),
-                        contentDescription = "After",
+                        bitmap = beforeBitmap.asImageBitmap(),
+                        contentDescription = "Before",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .width(with(LocalDensity.current) { boxSize.width.toDp() })
-                            .fillMaxHeight()
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-            }
 
-            // Magic Eraser Mask Overlay
-            if (maskBitmap != null && activeTab == StudioTab.ERASER && !hasAfter) {
-                Image(
-                    bitmap = maskBitmap.asImageBitmap(),
-                    contentDescription = "Mask Overlay",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // YuNet Face Box & 5-Point Landmarks Overlay
-            if (detectedFaces.isNotEmpty() && beforeBitmap != null) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val sx = size.width / beforeBitmap.width.toFloat()
-                    val sy = size.height / beforeBitmap.height.toFloat()
-                    val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
-                    detectedFaces.forEach { face ->
-                        drawRect(
-                            color = StudioColors.Sky,
-                            topLeft = Offset(face.box.left * sx, face.box.top * sy),
-                            size = Size(face.box.width() * sx, face.box.height() * sy),
-                            style = Stroke(width = 3.dp.toPx(), pathEffect = dash)
+                // Clipped: AFTER image (hidden while holding original compare button)
+                if (afterBitmap != null && !holdingOriginal && boxSize.width > 0) {
+                    val clipWidthDp = with(LocalDensity.current) {
+                        (boxSize.width * (1f - splitFraction)).toDp()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(clipWidthDp)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                    ) {
+                        Image(
+                            bitmap = afterBitmap.asImageBitmap(),
+                            contentDescription = "After",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .width(with(LocalDensity.current) { boxSize.width.toDp() })
+                                .fillMaxHeight()
                         )
-                        face.landmarks.forEach { (lx, ly) ->
-                            drawCircle(
-                                color = StudioColors.Mint,
-                                radius = 4.dp.toPx(),
-                                center = Offset(lx * sx, ly * sy)
+                    }
+                }
+
+                // Magic Eraser Mask Overlay
+                if (maskBitmap != null && activeTab == StudioTab.ERASER && !hasAfter) {
+                    Image(
+                        bitmap = maskBitmap.asImageBitmap(),
+                        contentDescription = "Mask Overlay",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // YuNet Face Box & 5-Point Landmarks Overlay
+                if (detectedFaces.isNotEmpty() && beforeBitmap != null) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val sx = size.width / beforeBitmap.width.toFloat()
+                        val sy = size.height / beforeBitmap.height.toFloat()
+                        val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
+                        detectedFaces.forEach { face ->
+                            drawRect(
+                                color = StudioColors.Sky,
+                                topLeft = Offset(face.box.left * sx, face.box.top * sy),
+                                size = Size(face.box.width() * sx, face.box.height() * sy),
+                                style = Stroke(width = 3.dp.toPx(), pathEffect = dash)
                             )
+                            face.landmarks.forEach { (lx, ly) ->
+                                drawCircle(
+                                    color = StudioColors.Mint,
+                                    radius = 4.dp.toPx(),
+                                    center = Offset(lx * sx, ly * sy)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Before/After Divider & Labels
+            // Before/After Divider, Badges & Hold-to-Compare Eye Button
             if (hasAfter && boxSize.width > 0) {
-                TagBadge("BEFORE", Color.White, Modifier.align(Alignment.TopStart).padding(10.dp))
-                TagBadge(afterBadgeLabel, StudioColors.Mint, Modifier.align(Alignment.TopEnd).padding(10.dp))
+                if (holdingOriginal) {
+                    TagBadge("ORIGINAL (HOLDING)", Color.White, Modifier.align(Alignment.TopStart).padding(10.dp))
+                } else {
+                    TagBadge("BEFORE", Color.White, Modifier.align(Alignment.TopStart).padding(10.dp))
+                    TagBadge(afterBadgeLabel, StudioColors.Mint, Modifier.align(Alignment.TopEnd).padding(10.dp))
 
-                val lineX = (boxSize.width * splitFraction).roundToInt()
-                Box(
-                    modifier = Modifier
-                        .offset { IntOffset(lineX - 1, 0) }
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .background(Color.White)
-                )
-                Box(
-                    modifier = Modifier
-                        .offset { IntOffset(lineX - 44, (boxSize.height / 2) - 44) }
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("⇄", color = StudioColors.Bg, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                    val lineX = (boxSize.width * splitFraction).roundToInt()
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset(lineX - 1, 0) }
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(Color.White)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset(lineX - 44, (boxSize.height / 2) - 44) }
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("⇄", color = StudioColors.Bg, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                    }
                 }
+
+                // Hold-to-Compare Eye Pill (bottom-right of canvas)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xCC12161F))
+                        .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    holdingOriginal = true
+                                    tryAwaitRelease()
+                                    holdingOriginal = false
+                                }
+                            )
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Icon(Icons.Rounded.Visibility, contentDescription = "Hold to compare", tint = StudioColors.TextPrimary, modifier = Modifier.size(14.dp))
+                        Text("Hold", color = StudioColors.TextPrimary, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // Zoom Indicator Pill
+            if (zoomScale > 1.05f) {
+                TagBadge(
+                    "${"%.1f".format(zoomScale)}× • Double-tap reset",
+                    StudioColors.Sky,
+                    Modifier.align(Alignment.BottomStart).padding(10.dp)
+                )
             }
 
             // Live Processing HUD
