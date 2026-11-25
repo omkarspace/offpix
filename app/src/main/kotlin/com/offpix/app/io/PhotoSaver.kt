@@ -7,9 +7,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,5 +75,24 @@ object PhotoSaver {
         }
 
         uri
+    }
+
+    /**
+     * Writes the rescued bitmap to app-private cache and returns a FileProvider URI
+     * for offline Android Share Sheet intents (zero cloud upload).
+     */
+    suspend fun prepareShareUri(
+        context: Context,
+        bitmap: Bitmap,
+        tagSuffix: String
+    ): Uri = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        // Keep cache tidy by removing old temporary share files
+        dir.listFiles()?.forEach { it.delete() }
+        val file = File(dir, "OffPix_${tagSuffix}.jpg")
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     }
 }

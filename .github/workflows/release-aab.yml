@@ -1,0 +1,59 @@
+name: Build Play Store Release AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_gfpgan:
+        description: "Include GFPGAN model in :pack_models (true/false)"
+        required: false
+        default: "false"
+        type: string
+
+jobs:
+  build-release-aab:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch open-source LiteRT models into :pack_models
+        run: |
+          if [ "${{ github.event.inputs.include_gfpgan }}" = "true" ]; then
+            python scripts/fetch_models.py --include-gfpgan
+            if [ -f pack_models/src/main/assets/models/gfpgan_v14_fp16.tflite ]; then
+              mv pack_models/src/main/assets/models/gfpgan_v14_fp16.tflite pack_models/src/main/assets/models/gfpgan_v14_opt.tflite
+            fi
+          else
+            python scripts/fetch_models.py
+          fi
+          ls -lh pack_models/src/main/assets/models/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Build Play Store Android App Bundle (.aab)
+        run: gradle :app:bundleRelease --stacktrace
+
+      - name: Report AAB size
+        run: ls -lh app/build/outputs/bundle/release/*.aab
+
+      - name: Upload Play Store AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpix-playstore-release-aab
+          path: app/build/outputs/bundle/release/*.aab
+          retention-days: 14

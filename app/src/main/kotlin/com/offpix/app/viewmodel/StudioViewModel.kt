@@ -38,8 +38,35 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     init {
         viewModelScope.launch {
             val saved = RecentRescuesStore.loadAll(getApplication())
-            if (saved.isNotEmpty()) {
-                _uiState.update { it.copy(recentRescues = saved) }
+            val availability = ModelId.entries.associate { it.displayName to runtime.isModelAssetPresent(it) }
+            _uiState.update {
+                it.copy(
+                    recentRescues = saved,
+                    modelAvailability = availability
+                )
+            }
+        }
+    }
+
+    fun clearRecentRescues() {
+        RecentRescuesStore.clearAll(getApplication())
+        _uiState.update { it.copy(recentRescues = emptyList(), toastMessage = "Recent history cleared") }
+    }
+
+    fun prepareShare(onUriReady: (Uri) -> Unit) {
+        val state = _uiState.value
+        val toShare = state.afterBitmap ?: state.beforeBitmap ?: return
+        viewModelScope.launch {
+            try {
+                val uri = PhotoSaver.prepareShareUri(
+                    context = getApplication(),
+                    bitmap = toShare,
+                    tagSuffix = state.activeTab.name.lowercase()
+                )
+                _uiState.update { it.copy(showExportSheet = false) }
+                onUriReady(uri)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(toastMessage = "Share failed: ${e.message}") }
             }
         }
     }

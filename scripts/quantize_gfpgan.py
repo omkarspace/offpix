@@ -2,14 +2,9 @@
 """
 Phase 0: Quantize GFPGAN v1.4 (Apache 2.0) to hit OffPix's < 500 MB total app budget.
 
-Why:
-  The pre-built litert-community/GFPGAN-v1.4-LiteRT file is 431 MB (and ~1.3 GB peak RAM),
-  which pushes the full 6-model bundle to ~606 MB and risks OOM on 4 GB budget Android phones.
-  Original GFPGANv1.4.pth is 348 MB FP32 -> Clean FP16 is ~174 MB, and W8A16 (INT8 weights)
-  is ~95-115 MB, bringing OffPix's total installed footprint down to ~285-350 MB.
-
-Requirements (run in a clean Python 3.10/3.11 venv):
-    pip install torch torchvision gfpgan ai-edge-torch ai-edge-litert pillow numpy
+Uses `litert-torch` + `ai-edge-quantizer` (same proven pipeline used by litert-community):
+  - profile=fp16  -> FLOAT_CASTING (~174 MB)
+  - profile=w8a16 -> DYNAMIC_RANGE INT8 weights (~95-115 MB)
 
 Usage:
     python scripts/quantize_gfpgan.py --weights GFPGANv1.4.pth --profile fp16
@@ -18,16 +13,28 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import os
 import sys
+import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "pack_models" / "src" / "main" / "assets" / "models"
 
 
+def install_torchvision_shim() -> None:
+    """basicsr <= 1.4.2 imports deprecated `torchvision.transforms.functional_tensor`."""
+    import torchvision.transforms.functional as tv_f  # type: ignore
+    sys.modules["torchvision.transforms.functional_tensor"] = tv_f
+
+
 def export_gfpgan(weights_path: Path, profile: str) -> Path:
+    install_torchvision_shim()
+
     import torch
-    import ai_edge_torch  # type: ignore
+    import litert_torch  # type: ignore
+    from ai_edge_quantizer import quantizer, recipe_manager  # type: ignore
+    from ai_edge_quantizer.recipe import AlgorithmName, qtyping  # type: ignore
     from gfpgan.archs.gfpganv1_clean_arch import GFPGANv1Clean  # type: ignore
 
     print(f"[1/4] Loading GFPGAN v1.4 Clean architecture from {weights_path}...")
@@ -43,7 +50,7 @@ def export_gfpgan(weights_path: Path, profile: str) -> Path:
         narrow=1,
         sft_half=True,
     )
-    ckpt = torch.load(str(weights_path), map_location="cpu")
+    ckpt = torch.load(str(weights_path), map_location="cpu", weights_only=False)
     state = ckpt.get("params_ema", ckpt.get("params", ckpt))
     model.load_state_dict(state, strict=True)
     model.eval()
@@ -60,40 +67,51 @@ def export_gfpgan(weights_path: Path, profile: str) -> Path:
     wrapped = GfpganWrapper(model).eval()
     sample_input = (torch.randn(1, 3, 512, 512),)
 
-    print(f"[2/4] Converting to LiteRT ({profile})...")
+    fp32_path = Path(tempfile.gettempdir()) / "gfpgan_v14_fp32.tflite"
+    print(f"[2/4] Converting PyTorch -> FP32 LiteRT ({fp32_path})...")
+    with torch.no_grad():
+        litert_torch.convert(wrapped, sample_input).export(str(fp32_path))
+    fp32_mb = fp32_path.stat().st_size / (1024 * 1024)
+    print(f"      FP32 size: {fp32_mb:.1f} MB")
+
+    print(f"[3/4] Quantizing via ai-edge-quantizer (profile={profile})...")
+    rmgr = recipe_manager.RecipeManager()
     if profile == "fp16":
-        tfl_flags = {"_experimental_lower_tensor_list_ops": True}
-        edge_model = ai_edge_torch.convert(
-            wrapped,
-            sample_input,
-            _ai_edge_converter_flags={
-                "optimizations": ["DEFAULT"],
-                "target_spec.supported_types": ["float16"],
-                **tfl_flags,
-            },
+        rmgr.add_quantization_config(
+            regex=".*",
+            operation_name=qtyping.TFLOperationName.ALL_SUPPORTED,
+            op_config=qtyping.OpQuantizationConfig(
+                weight_tensor_config=qtyping.TensorQuantizationConfig(
+                    num_bits=16, dtype=qtyping.TensorDataType.FLOAT
+                ),
+                compute_precision=qtyping.ComputePrecision.FLOAT,
+            ),
+            algorithm_key=AlgorithmName.FLOAT_CASTING,
         )
     elif profile == "w8a16":
-        from ai_edge_torch.quantize import pt2e_quantizer, quant_config  # type: ignore
-        q = pt2e_quantizer.PT2EQuantizer().set_global(
-            pt2e_quantizer.get_symmetric_quantization_config(is_dynamic=True)
-        )
-        edge_model = ai_edge_torch.convert(
-            wrapped,
-            sample_input,
-            quant_config=quant_config.QuantConfig(pt2e_quantizer=q),
+        rmgr.add_dynamic_config(
+            regex=".*",
+            operation_name=qtyping.TFLOperationName.ALL_SUPPORTED,
+            num_bits=8,
+            granularity=qtyping.QuantGranularity.CHANNELWISE,
         )
     else:
         raise ValueError(f"Unsupported profile: {profile}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_file = OUT_DIR / "gfpgan_v14_opt.tflite"
-    print(f"[3/4] Exporting -> {out_file}...")
-    edge_model.export(str(out_file))
+    if out_file.exists():
+        out_file.unlink()
+
+    qt = quantizer.Quantizer(float_model=str(fp32_path))
+    qt.load_quantization_recipe(rmgr.get_quantization_recipe())
+    qt.quantize().export_model(str(out_file))
+
+    if fp32_path.exists():
+        os.remove(fp32_path)
 
     size_mb = out_file.stat().st_size / (1024 * 1024)
-    print(f"[4/4] Done! Output size: {size_mb:.1f} MB (target <= 175 MB)")
-    if size_mb > 200:
-        print("[WARN] Model exceeded 200 MB; check StyleGAN2 weight folding or try --profile w8a16.")
+    print(f"[4/4] Done! {fp32_mb:.1f} MB -> {size_mb:.1f} MB ({out_file})")
     return out_file
 
 
@@ -105,7 +123,6 @@ def main() -> int:
 
     if not args.weights.exists():
         print(f"ERROR: Weights not found at {args.weights}")
-        print("Download official Apache 2.0 GFPGANv1.4.pth from https://github.com/TencentARC/GFPGAN/releases")
         return 1
 
     export_gfpgan(args.weights, args.profile)

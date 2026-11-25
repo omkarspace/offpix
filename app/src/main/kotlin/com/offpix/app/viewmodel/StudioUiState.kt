@@ -74,5 +74,6 @@ data class StudioUiState(
     val exportFormat: ExportFormat = ExportFormat.JPEG_95,
     val preserveExif: Boolean = true,
     val toastMessage: String? = null,
-    val recentRescues: List<RecentRescue> = emptyList()
+    val recentRescues: List<RecentRescue> = emptyList(),
+    val modelAvailability: Map<String, Boolean> = emptyMap()
 )

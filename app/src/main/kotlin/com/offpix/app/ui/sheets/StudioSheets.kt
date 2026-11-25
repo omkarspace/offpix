@@ -42,6 +42,7 @@ fun ExportBottomSheet(
     onFormatChange: (ExportFormat) -> Unit,
     onPreserveExifChange: (Boolean) -> Unit,
     onConfirmSave: () -> Unit,
+    onShareOffline: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -126,15 +127,30 @@ fun ExportBottomSheet(
                 )
             }
 
-            Button(
-                onClick = onConfirmSave,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = StudioColors.Mint, contentColor = StudioColors.OnMint)
-            ) {
-                Text("Save to Gallery", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onShareOffline,
+                    modifier = Modifier
+                        .weight(0.42f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = StudioColors.Surface3,
+                        contentColor = StudioColors.TextPrimary
+                    )
+                ) {
+                    Text("Share", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Button(
+                    onClick = onConfirmSave,
+                    modifier = Modifier
+                        .weight(0.58f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = StudioColors.Mint, contentColor = StudioColors.OnMint)
+                ) {
+                    Text("Save to Gallery", fontWeight = FontWeight.ExtraBold, fontSize = 14.5.sp)
+                }
             }
             Spacer(Modifier.height(14.dp))
         }
@@ -162,14 +178,17 @@ private fun FormatChip(label: String, selected: Boolean, modifier: Modifier, onC
 @Composable
 fun EngineLicensesSheet(
     activeAccelerator: String,
+    modelAvailability: Map<String, Boolean>,
     onDismiss: () -> Unit
 ) {
     val models = listOf(
-        Triple("Real-ESRGAN General x4v3", "3.5 MB • FP16 • 4x Super-Resolution", "BSD-3"),
-        Triple("NAFNet-GoPro-width32", "38.3 MB • FP16 • Motion Deblur", "MIT"),
-        Triple("YuNet + GFPGAN v1.4", "0.3 MB + Quantized • Face Align & Restore", "MIT / Apache 2.0"),
-        Triple("SAM 2.1 Hiera-Tiny (Enc + Dec)", "80 MB + 17 MB • Tap-to-Select Mask", "Apache 2.0"),
-        Triple("MI-GAN 512 Places2", "16.3 MB • FP16 • Object Inpainting", "MIT")
+        Triple("Real-ESRGAN x4v3", "3.4 MB • FP16 • 4x Super-Resolution", "BSD-3"),
+        Triple("NAFNet-GoPro-w32", "36.5 MB • FP16 • Motion Deblur", "MIT"),
+        Triple("YuNet Face Detector", "0.24 MB • FP16 • 5-Point Landmarks", "MIT"),
+        Triple("GFPGAN v1.4", "Quantized • Face Restoration", "Apache 2.0"),
+        Triple("SAM 2.1 Encoder", "76.5 MB • FP16 • Image Embeddings", "Apache 2.0"),
+        Triple("SAM 2.1 Decoder", "16.2 MB • FP16 • Tap-to-Select Mask", "Apache 2.0"),
+        Triple("MI-GAN 512 Places2", "15.6 MB • FP16 • Object Inpainting", "MIT")
     )
 
     ModalBottomSheet(
@@ -203,6 +222,7 @@ fun EngineLicensesSheet(
             }
 
             models.forEach { (name, detail, lic) ->
+                val installed = modelAvailability[name] == true
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -215,7 +235,11 @@ fun EngineLicensesSheet(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(name, color = StudioColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp)
-                        Text(detail, color = StudioColors.TextSecondary, fontSize = 11.sp)
+                        Text(
+                            "$detail • ${if (installed) "Installed Offline" else "Not Bundled"}",
+                            color = if (installed) StudioColors.Mint else StudioColors.TextMuted,
+                            fontSize = 10.5.sp
+                        )
                     }
                     Text(
                         lic,

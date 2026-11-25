@@ -1,6 +1,7 @@
 package com.offpix.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -102,6 +103,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                                 onOpenRecent = { uri -> vm.onPhotoSelected(uri, StudioTab.UPSCALE) },
+                                onClearRecents = vm::clearRecentRescues,
                                 onOpenEngineSheet = { vm.setShowEngineSheet(true) }
                             )
 
@@ -146,6 +148,16 @@ class MainActivity : ComponentActivity() {
                                 onFormatChange = vm::setExportFormat,
                                 onPreserveExifChange = vm::setPreserveExif,
                                 onConfirmSave = { triggerSaveWithPermissionCheck() },
+                                onShareOffline = {
+                                    vm.prepareShare { uri ->
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "image/jpeg"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        startActivity(Intent.createChooser(shareIntent, "Share Rescued Photo"))
+                                    }
+                                },
                                 onDismiss = { vm.setShowExportSheet(false) }
                             )
                         }
@@ -153,6 +165,7 @@ class MainActivity : ComponentActivity() {
                         if (state.showEngineSheet) {
                             EngineLicensesSheet(
                                 activeAccelerator = state.activeAccelerator,
+                                modelAvailability = state.modelAvailability,
                                 onDismiss = { vm.setShowEngineSheet(false) }
                             )
                         }

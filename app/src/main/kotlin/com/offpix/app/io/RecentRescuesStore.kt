@@ -40,6 +40,13 @@ object RecentRescuesStore {
         prefs.edit().putString(KEY_ITEMS, updated.toString()).apply()
     }
 
+    fun clearAll(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_ITEMS)
+            .apply()
+    }
+
     suspend fun loadAll(context: Context): List<RecentRescue> = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val arr = runCatching { JSONArray(prefs.getString(KEY_ITEMS, "[]")) }

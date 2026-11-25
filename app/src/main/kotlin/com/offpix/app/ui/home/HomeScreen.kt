@@ -54,6 +54,7 @@ fun HomeScreen(
     recentRescues: List<RecentRescue>,
     onPickPhoto: (StudioTab) -> Unit,
     onOpenRecent: (android.net.Uri) -> Unit,
+    onClearRecents: () -> Unit,
     onOpenEngineSheet: () -> Unit
 ) {
     Column(
@@ -204,7 +205,20 @@ fun HomeScreen(
 
             // Recent Rescues Strip
             if (recentRescues.isNotEmpty()) {
-                Text("RECENT RESCUES (LOCAL)", color = StudioColors.TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("RECENT RESCUES (LOCAL)", color = StudioColors.TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Clear",
+                        color = StudioColors.TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(onClick = onClearRecents)
+                    )
+                }
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 12.dp)

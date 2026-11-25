@@ -3,7 +3,13 @@ package com.offpix.app.ml
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Pure JVM unit tests validating core ML math (NMS IoU, raised-cosine tile weights,
@@ -60,5 +66,38 @@ class MathAndPipelineTest {
         assertTrue(abs(iou(0f, 0f, 100f, 100f, 50f, 0f, 150f, 100f) - (1f / 3f)) < 1e-5f)
         // Disjoint -> 0.0
         assertEquals(0.0f, iou(0f, 0f, 10f, 10f, 20f, 20f, 30f, 30f), 1e-5f)
+    }
+
+    @Test
+    fun sam2PromptConstBinaryMatchesExact3072ByteContract() {
+        val candidates = listOf(
+            File("src/main/assets/models/prompt_encode_const.bin"),
+            File("app/src/main/assets/models/prompt_encode_const.bin")
+        )
+        val binFile = candidates.firstOrNull { it.exists() }
+            ?: error("prompt_encode_const.bin not found in assets")
+        val bytes = binFile.readBytes()
+        assertEquals(3072, bytes.size)
+
+        val fb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+        val all = FloatArray(768)
+        fb.get(all)
+        val posmat = all.copyOfRange(0, 256)
+        val pointEmbed = all.copyOfRange(256, 512)
+        val notAPoint = all.copyOfRange(512, 768)
+
+        // Encode center click (0.5, 0.5) using exact SAM 2.1 formula
+        val a = 2f * ((512f + 0.5f) / 1024f) - 1f
+        val b = 2f * ((512f + 0.5f) / 1024f) - 1f
+        val sparse = FloatArray(512)
+        for (l in 0 until 128) {
+            val u = (2.0 * PI * (a * posmat[l] + b * posmat[128 + l])).toFloat()
+            sparse[l] = sin(u) + pointEmbed[l]
+            sparse[128 + l] = cos(u) + pointEmbed[128 + l]
+        }
+        System.arraycopy(notAPoint, 0, sparse, 256, 256)
+
+        assertTrue(sparse.all { it.isFinite() })
+        assertTrue(sparse.any { abs(it) > 1e-3f })
     }
 }
