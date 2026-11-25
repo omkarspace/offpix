@@ -95,8 +95,8 @@ fun BeforeAfterStage(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF07090D))
-            .padding(14.dp),
+            .background(Color.Transparent)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(

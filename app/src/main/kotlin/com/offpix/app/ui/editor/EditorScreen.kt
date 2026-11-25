@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -25,8 +26,6 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.FaceRetouchingNatural
 import androidx.compose.material.icons.rounded.Hd
 import androidx.compose.material.icons.rounded.PhotoLibrary
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -77,47 +76,37 @@ fun EditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(StudioColors.Bg)
+            .background(StudioColors.AmbientGlowBrush)
     ) {
-        // Top Bar
+        // Glassmorphic Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(58.dp)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TopIconBtn(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBackHome)
-                TopIconBtn(Icons.Rounded.PhotoLibrary, "Pick Photo", onClick = onPickAnotherPhoto)
-                TopIconBtn(
-                    Icons.AutoMirrored.Rounded.Undo,
-                    "Undo",
-                    enabled = state.canUndo,
-                    onClick = onUndo
-                )
-                TopIconBtn(
-                    Icons.AutoMirrored.Rounded.Redo,
-                    "Redo",
-                    enabled = state.canRedo,
-                    onClick = onRedo
-                )
+                TopGlassCircleBtn(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBackHome)
+                TopGlassCircleBtn(Icons.Rounded.PhotoLibrary, "Pick Photo", onClick = onPickAnotherPhoto)
+                TopGlassCircleBtn(Icons.AutoMirrored.Rounded.Undo, "Undo", enabled = state.canUndo, onClick = onUndo)
+                TopGlassCircleBtn(Icons.AutoMirrored.Rounded.Redo, "Redo", enabled = state.canRedo, onClick = onRedo)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TopIconBtn(Icons.Rounded.Bolt, "Engine Status", onClick = onOpenEngineSheet)
-                Button(
-                    onClick = onOpenExportSheet,
-                    shape = RoundedCornerShape(999.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = StudioColors.Mint,
-                        contentColor = StudioColors.OnMint
-                    ),
-                    modifier = Modifier.height(36.dp)
+                TopGlassCircleBtn(Icons.Rounded.Bolt, "Engine Status", onClick = onOpenEngineSheet)
+                Row(
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(StudioColors.PrimaryGradient)
+                        .clickable(onClick = onOpenExportSheet)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("Save", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                    Icon(Icons.Rounded.Download, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    Text("Save", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 12.5.sp)
                 }
             }
         }
@@ -142,18 +131,20 @@ fun EditorScreen(
             modifier = Modifier.weight(1f)
         )
 
-        // Context Controls Drawer
+        // Frosted Glass Context Controls Card
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(StudioColors.Surface)
-                .border(1.dp, StudioColors.Border)
+                .border(1.dp, StudioColors.Border, RoundedCornerShape(24.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             when (state.activeTab) {
                 StudioTab.UPSCALE -> {
-                    SegmentedPair(
+                    GradientPillPair(
                         leftLabel = "2x Fast HD",
                         rightLabel = "4x Ultra HD",
                         leftSelected = state.upscaleFactor == 2,
@@ -165,27 +156,19 @@ fun EditorScreen(
                         value = state.upscaleSharpness,
                         valueRange = 0.3f..1f,
                         valueText = "${(state.upscaleSharpness * 100).roundToInt()}%",
-                        tint = StudioColors.Mint,
                         onValueChange = onUpscaleSharpnessChange
                     )
-                    Button(
-                        onClick = onRunUpscale,
+                    GradientCtaButton(
+                        text = "Enhance ${state.upscaleFactor}x HD (Real-ESRGAN)",
                         enabled = !state.isProcessing,
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = StudioColors.Mint,
-                            contentColor = StudioColors.OnMint
-                        )
-                    ) {
-                        Text("Enhance ${state.upscaleFactor}x HD (Real-ESRGAN)", fontWeight = FontWeight.ExtraBold)
-                    }
+                        onClick = onRunUpscale
+                    )
                 }
 
                 StudioTab.UNBLUR -> {
-                    SegmentedPair(
+                    GradientPillPair(
                         leftLabel = "Quick Fix (NAFNet)",
-                        rightLabel = "Portrait Restore (GFPGAN)",
+                        rightLabel = "Portrait Restore",
                         leftSelected = state.unblurMode == UnblurMode.QUICK_FIX,
                         onSelectLeft = { onUnblurModeChange(UnblurMode.QUICK_FIX) },
                         onSelectRight = { onUnblurModeChange(UnblurMode.PORTRAIT_RESTORE) }
@@ -195,16 +178,15 @@ fun EditorScreen(
                         value = state.unblurStrength,
                         valueRange = 0.4f..1f,
                         valueText = "${(state.unblurStrength * 100).roundToInt()}%",
-                        tint = StudioColors.Sky,
                         onValueChange = onUnblurStrengthChange
                     )
                     if (state.noFaceDetected && state.unblurMode == UnblurMode.PORTRAIT_RESTORE) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(StudioColors.Sky.copy(alpha = 0.12f))
-                                .border(1.dp, StudioColors.Sky.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(StudioColors.Violet.copy(alpha = 0.16f))
+                                .border(1.dp, StudioColors.Magenta.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                                 .padding(horizontal = 10.dp, vertical = 7.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -212,34 +194,26 @@ fun EditorScreen(
                             Text("No face detected in photo", color = StudioColors.TextPrimary, fontSize = 11.5.sp)
                             Text(
                                 "Use Quick Fix →",
-                                color = StudioColors.Sky,
+                                color = StudioColors.Coral,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.clickable { onUnblurModeChange(UnblurMode.QUICK_FIX) }
                             )
                         }
                     }
-                    Button(
-                        onClick = onRunUnblur,
-                        enabled = !state.isProcessing,
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = StudioColors.Sky,
-                            contentColor = StudioColors.OnSky
-                        )
-                    ) {
-                        val cta = if (state.unblurMode == UnblurMode.QUICK_FIX) {
+                    GradientCtaButton(
+                        text = if (state.unblurMode == UnblurMode.QUICK_FIX) {
                             "Fix Motion Blur (NAFNet)"
                         } else {
                             "Detect & Restore Face (YuNet + GFPGAN)"
-                        }
-                        Text(cta, fontWeight = FontWeight.ExtraBold)
-                    }
+                        },
+                        enabled = !state.isProcessing,
+                        onClick = onRunUnblur
+                    )
                 }
 
                 StudioTab.ERASER -> {
-                    SegmentedPair(
+                    GradientPillPair(
                         leftLabel = "Tap Object (SAM 2.1)",
                         rightLabel = "Brush Mask",
                         leftSelected = state.eraserTool == EraserTool.TAP_OBJECT,
@@ -255,7 +229,7 @@ fun EditorScreen(
                             color = StudioColors.TextSecondary,
                             fontSize = 11.5.sp
                         )
-                        Text(state.maskStatusText, color = StudioColors.Purple, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        Text(state.maskStatusText, color = StudioColors.Coral, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                     }
                     if (state.eraserTool == EraserTool.BRUSH) {
                         LabeledSlider(
@@ -263,94 +237,76 @@ fun EditorScreen(
                             value = state.brushSizePx,
                             valueRange = 12f..54f,
                             valueText = "${state.brushSizePx.roundToInt()} px",
-                            tint = StudioColors.Purple,
                             onValueChange = onBrushSizeChange
                         )
                     }
                     if (state.afterBitmap != null) {
-                        Button(
-                            onClick = onEraseAnother,
-                            modifier = Modifier.fillMaxWidth().height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = StudioColors.Purple,
-                                contentColor = StudioColors.OnPurple
-                            )
-                        ) {
-                            Text("Erase Another Object", fontWeight = FontWeight.ExtraBold)
-                        }
+                        GradientCtaButton(
+                            text = "Erase Another Object",
+                            enabled = true,
+                            onClick = onEraseAnother
+                        )
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
                                 onClick = onClearMask,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(999.dp),
                                 modifier = Modifier.height(44.dp)
                             ) {
                                 Text("Clear", color = StudioColors.TextPrimary, fontWeight = FontWeight.Bold)
                             }
-                            Button(
-                                onClick = onRunErase,
+                            GradientCtaButton(
+                                text = "Erase Selection (MI-GAN)",
                                 enabled = state.hasMask && !state.isProcessing,
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = StudioColors.Purple,
-                                    contentColor = StudioColors.OnPurple
-                                )
-                            ) {
-                                Text("Erase Selection (MI-GAN)", fontWeight = FontWeight.ExtraBold)
-                            }
+                                onClick = onRunErase,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
         }
 
-        // Material 3 3-Tab Bottom Bar
-        Row(
+        // Floating Frosted-Glass Pill Dock for the 3 Core Tabs
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp)
-                .background(Color(0xFF0E1118))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
         ) {
-            BottomNavTab(
-                label = "Upscale",
-                icon = Icons.Rounded.Hd,
-                active = state.activeTab == StudioTab.UPSCALE,
-                accent = StudioColors.Mint,
-                onClick = { onSelectTab(StudioTab.UPSCALE) }
-            )
-            BottomNavTab(
-                label = "Unblur & Face",
-                icon = Icons.Rounded.FaceRetouchingNatural,
-                active = state.activeTab == StudioTab.UNBLUR,
-                accent = StudioColors.Sky,
-                onClick = { onSelectTab(StudioTab.UNBLUR) }
-            )
-            BottomNavTab(
-                label = "Magic Eraser",
-                icon = Icons.Rounded.AutoFixHigh,
-                active = state.activeTab == StudioTab.ERASER,
-                accent = StudioColors.Purple,
-                onClick = { onSelectTab(StudioTab.ERASER) }
-            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(StudioColors.GlassDark)
+                    .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EditorDockPill("Upscale", Icons.Rounded.Hd, state.activeTab == StudioTab.UPSCALE) {
+                    onSelectTab(StudioTab.UPSCALE)
+                }
+                EditorDockPill("Unblur", Icons.Rounded.FaceRetouchingNatural, state.activeTab == StudioTab.UNBLUR) {
+                    onSelectTab(StudioTab.UNBLUR)
+                }
+                EditorDockPill("Eraser", Icons.Rounded.AutoFixHigh, state.activeTab == StudioTab.ERASER) {
+                    onSelectTab(StudioTab.ERASER)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun TopIconBtn(icon: ImageVector, desc: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun TopGlassCircleBtn(icon: ImageVector, desc: String, enabled: Boolean = true, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .size(36.dp)
-            .clip(RoundedCornerShape(11.dp))
-            .background(StudioColors.Surface)
-            .border(1.dp, StudioColors.Border, RoundedCornerShape(11.dp))
+            .clip(CircleShape)
+            .background(StudioColors.Glass)
+            .border(1.dp, StudioColors.Border, CircleShape)
     ) {
         Icon(
             icon,
@@ -362,7 +318,7 @@ private fun TopIconBtn(icon: ImageVector, desc: String, enabled: Boolean = true,
 }
 
 @Composable
-private fun SegmentedPair(
+private fun GradientPillPair(
     leftLabel: String,
     rightLabel: String,
     leftSelected: Boolean,
@@ -372,32 +328,59 @@ private fun SegmentedPair(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(999.dp))
             .background(StudioColors.Bg)
-            .border(1.dp, StudioColors.Border, RoundedCornerShape(12.dp))
+            .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        SegOption(leftLabel, leftSelected, Modifier.weight(1f), onSelectLeft)
-        SegOption(rightLabel, !leftSelected, Modifier.weight(1f), onSelectRight)
+        PillOption(leftLabel, leftSelected, Modifier.weight(1f), onSelectLeft)
+        PillOption(rightLabel, !leftSelected, Modifier.weight(1f), onSelectRight)
     }
 }
 
 @Composable
-private fun SegOption(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun PillOption(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier = modifier
             .height(34.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(if (selected) StudioColors.Surface3 else Color.Transparent)
+            .clip(RoundedCornerShape(999.dp))
+            .then(if (selected) Modifier.background(StudioColors.PrimaryGradient) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (selected) StudioColors.TextPrimary else StudioColors.TextSecondary,
+            color = if (selected) Color.White else StudioColors.TextSecondary,
             fontSize = 11.5.sp,
             fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun GradientCtaButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth()
+) {
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .then(
+                if (enabled) Modifier.background(StudioColors.PrimaryGradient)
+                else Modifier.background(StudioColors.Surface3)
+            )
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (enabled) Color.White else StudioColors.TextMuted,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp
         )
     }
 }
@@ -408,7 +391,6 @@ private fun LabeledSlider(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     valueText: String,
-    tint: Color,
     onValueChange: (Float) -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -417,7 +399,11 @@ private fun LabeledSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
-            colors = SliderDefaults.colors(thumbColor = tint, activeTrackColor = tint),
+            colors = SliderDefaults.colors(
+                thumbColor = StudioColors.Coral,
+                activeTrackColor = StudioColors.Magenta,
+                inactiveTrackColor = StudioColors.Surface3
+            ),
             modifier = Modifier.weight(1f)
         )
         Text(valueText, color = StudioColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -425,33 +411,21 @@ private fun LabeledSlider(
 }
 
 @Composable
-private fun BottomNavTab(
-    label: String,
-    icon: ImageVector,
-    active: Boolean,
-    accent: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+private fun EditorDockPill(label: String, icon: ImageVector, active: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .then(
+                if (active) Modifier.background(StudioColors.PrimaryGradient)
+                else Modifier.background(Color.Transparent)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .width(56.dp)
-                .height(28.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(if (active) accent.copy(alpha = 0.18f) else Color.Transparent),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = label, tint = if (active) accent else StudioColors.TextMuted, modifier = Modifier.size(19.dp))
-        }
-        Text(
-            text = label,
-            color = if (active) StudioColors.TextPrimary else StudioColors.TextMuted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Icon(icon, contentDescription = label, tint = if (active) Color.White else StudioColors.TextSecondary, modifier = Modifier.size(18.dp))
+        Text(label, color = if (active) Color.White else StudioColors.TextSecondary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
     }
 }
