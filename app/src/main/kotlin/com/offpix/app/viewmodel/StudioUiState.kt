@@ -42,13 +42,13 @@ data class StudioUiState(
     val sourceUri: Uri? = null,
     val exifTags: Map<String, String> = emptyMap(),
 
-    // Tab 1: Upscale
+    // Tab 1: Upscale (100% pure Real-ESRGAN output by default for maximum crispness)
     val upscaleFactor: Int = 4,
-    val upscaleSharpness: Float = 0.80f,
+    val upscaleSharpness: Float = 1.0f,
 
     // Tab 2: Unblur & Face
     val unblurMode: UnblurMode = UnblurMode.QUICK_FIX,
-    val unblurStrength: Float = 0.85f,
+    val unblurStrength: Float = 1.0f,
     val detectedFaces: List<DetectedFaceOverlay> = emptyList(),
     val noFaceDetected: Boolean = false,
 

@@ -34,8 +34,23 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
         val outputBuffers = model.createOutputBuffers()
         val inFloats = FloatArray(128 * 128 * 3)
 
+        // Cap Real-ESRGAN 4x input longest edge to 576px (outputs crisp 2304px Ultra HD
+        // in ~25 tiles = ~1-2s with 4x lower RAM instead of 100 tiles / 268 MB accumulators)
+        val maxInEdge = if (scaleFactor == 4) 576 else 768
+        val workSrc = if (maxOf(source.width, source.height) > maxInEdge) {
+            val s = maxInEdge.toFloat() / maxOf(source.width, source.height).toFloat()
+            Bitmap.createScaledBitmap(
+                source,
+                (source.width * s).toInt().coerceAtLeast(64),
+                (source.height * s).toInt().coerceAtLeast(64),
+                true
+            )
+        } else {
+            source
+        }
+
         val upscaled4x = TilingEngine.processTiled(
-            source = source,
+            source = workSrc,
             tileIn = 128,
             overlapIn = 16,
             scale = 4,
@@ -49,9 +64,10 @@ class PhotoRescuePipelines(private val runtime: LiteRtRuntime) {
             val outFloats = outputBuffers[0].readFloat()
             TensorUtils.nchwRgb01ToBitmap(outFloats, 512, 512)
         }
+        if (workSrc !== source) workSrc.recycle()
 
         val target = if (scaleFactor == 2) {
-            Bitmap.createScaledBitmap(upscaled4x, source.width * 2, source.height * 2, true).also {
+            Bitmap.createScaledBitmap(upscaled4x, workSrc.width * 2, workSrc.height * 2, true).also {
                 if (it !== upscaled4x) upscaled4x.recycle()
             }
         } else {

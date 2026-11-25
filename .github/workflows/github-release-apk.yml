@@ -12,9 +12,9 @@ on:
         default: "v1.0.0"
         type: string
       include_gfpgan:
-        description: "Bundle 411 MB GFPGAN model inside APK (true/false)"
+        description: "Bundle GFPGAN v1.4 Face Restore model inside APK (true/false)"
         required: false
-        default: "false"
+        default: "true"
         type: string
 
 permissions:
@@ -35,10 +35,10 @@ jobs:
 
       - name: Download verified open-source LiteRT models
         run: |
-          if [ "${{ github.event.inputs.include_gfpgan }}" = "true" ]; then
-            python scripts/fetch_models.py --include-gfpgan
-          else
+          if [ "${{ github.event.inputs.include_gfpgan }}" = "false" ]; then
             python scripts/fetch_models.py
+          else
+            python scripts/fetch_models.py --include-gfpgan
           fi
           mkdir -p app/src/main/assets/models
           cp pack_models/src/main/assets/models/*.tflite app/src/main/assets/models/

@@ -69,12 +69,31 @@ object TilingEngine {
                 val x0 = (c * strideIn).coerceAtMost((source.width - tileIn).coerceAtLeast(0))
                 val srcW = minOf(tileIn, source.width - x0)
 
+                // Clear stale pixels and fill full tile (scales small border tiles cleanly)
+                tileBuf.eraseColor(android.graphics.Color.BLACK)
                 tileCanvas.drawBitmap(
                     source,
                     Rect(x0, y0, x0 + srcW, y0 + srcH),
                     Rect(0, 0, srcW, srcH),
                     copyPaint
                 )
+                // Replicate right/bottom edges if source is smaller than tileIn
+                if (srcW < tileIn) {
+                    tileCanvas.drawBitmap(
+                        tileBuf,
+                        Rect(srcW - 1, 0, srcW, srcH),
+                        Rect(srcW, 0, tileIn, srcH),
+                        copyPaint
+                    )
+                }
+                if (srcH < tileIn) {
+                    tileCanvas.drawBitmap(
+                        tileBuf,
+                        Rect(0, srcH - 1, tileIn, srcH),
+                        Rect(0, srcH, tileIn, tileIn),
+                        copyPaint
+                    )
+                }
 
                 val outTile = processTile(tileBuf)
                 outTile.getPixels(tilePixels, 0, tileOut, 0, 0, tileOut, tileOut)

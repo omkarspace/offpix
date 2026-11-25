@@ -64,7 +64,10 @@ class LiteRtRuntime(private val appContext: Context) : Closeable {
             "Model file missing: ${id.assetPath}. Run `python scripts/fetch_models.py` before building."
         }
 
-        val candidates = listOf(Accelerator.NPU, Accelerator.GPU, Accelerator.CPU)
+        // All litert-community FP16 models are verified full-GPU (ML Drift / LITERT_CL).
+        // Prioritize GPU first for reliable, fast execution across all Android chipsets,
+        // falling back to XNNPACK CPU if GPU drivers are unavailable.
+        val candidates = listOf(Accelerator.GPU, Accelerator.CPU)
         var lastError: Throwable? = null
         for (acc in candidates) {
             try {

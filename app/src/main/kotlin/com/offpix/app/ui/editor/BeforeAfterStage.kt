@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -83,13 +83,14 @@ fun BeforeAfterStage(
 ) {
     var splitFraction by remember(afterBitmap) { mutableFloatStateOf(0.5f) }
     var zoomScale by remember(beforeBitmap) { mutableFloatStateOf(1f) }
-    var panOffset by remember(beforeBitmap) { mutableStateOf(Offset.Zero) }
     var holdingOriginal by remember { mutableStateOf(false) }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
 
     val hasAfter = afterBitmap != null
+    // Match exact photo aspect ratio so tap & brush coordinates are 100% pixel-accurate
     val aspect = if (beforeBitmap != null && beforeBitmap.height > 0) {
-        (beforeBitmap.width.toFloat() / beforeBitmap.height.toFloat()).coerceIn(0.6f, 1.6f)
+        (beforeBitmap.width.toFloat() / beforeBitmap.height.toFloat()).coerceIn(0.45f, 2.2f)
     } else 1f
 
     Box(
@@ -102,42 +103,14 @@ fun BeforeAfterStage(
         Box(
             modifier = Modifier
                 .aspectRatio(aspect)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF10141D))
-                .border(1.dp, StudioColors.Border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color(0xFF120C1A))
+                .border(1.dp, StudioColors.Border, RoundedCornerShape(22.dp))
                 .onSizeChanged { boxSize = it }
-                // Double-tap resets zoom (when not in Magic Eraser tap mode)
-                .pointerInput(activeTab, hasAfter) {
-                    if (activeTab != StudioTab.ERASER || hasAfter) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                zoomScale = if (zoomScale > 1.05f) 1f else 2.25f
-                                panOffset = Offset.Zero
-                            }
-                        )
-                    }
-                }
-                // Pinch-to-zoom (1x - 4x) when inspecting upscaled/restored details
-                .pointerInput(activeTab, hasAfter, boxSize) {
-                    if (activeTab != StudioTab.ERASER || hasAfter) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (zoomScale * zoom).coerceIn(1f, 4f)
-                            zoomScale = newScale
-                            if (newScale > 1f) {
-                                val maxX = (boxSize.width * (newScale - 1f)) / 2f
-                                val maxY = (boxSize.height * (newScale - 1f)) / 2f
-                                panOffset = Offset(
-                                    (panOffset.x + pan.x).coerceIn(-maxX, maxX),
-                                    (panOffset.y + pan.y).coerceIn(-maxY, maxY)
-                                )
-                            } else {
-                                panOffset = Offset.Zero
-                            }
-                        }
-                    }
-                }
+                // Single non-conflicting gesture handler per mode so Before/After drag & Magic Eraser never fight!
                 .pointerInput(activeTab, eraserTool, hasAfter, boxSize) {
-                    if (activeTab == StudioTab.ERASER && !hasAfter && boxSize.width > 0 && boxSize.height > 0) {
+                    if (boxSize.width <= 0 || boxSize.height <= 0) return@pointerInput
+                    if (activeTab == StudioTab.ERASER && !hasAfter) {
                         if (eraserTool == EraserTool.TAP_OBJECT) {
                             detectTapGestures { offset ->
                                 onTapMask(
@@ -165,7 +138,7 @@ fun BeforeAfterStage(
                                 prevNorm = Offset(nx, ny)
                             }
                         }
-                    } else if (hasAfter && boxSize.width > 0 && zoomScale <= 1.05f) {
+                    } else if (hasAfter) {
                         detectDragGestures { change, _ ->
                             change.consume()
                             splitFraction = (change.position.x / boxSize.width).coerceIn(0.04f, 0.96f)
@@ -173,29 +146,27 @@ fun BeforeAfterStage(
                     }
                 }
         ) {
-            val zoomModifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = zoomScale
-                    scaleY = zoomScale
-                    translationX = panOffset.x
-                    translationY = panOffset.y
-                }
-
-            Box(modifier = zoomModifier) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = zoomScale
+                        scaleY = zoomScale
+                    }
+            ) {
                 // Base: BEFORE image
                 if (beforeBitmap != null) {
                     Image(
                         bitmap = beforeBitmap.asImageBitmap(),
                         contentDescription = "Before",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.FillBounds,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
 
-                // Clipped: AFTER image (hidden while holding original compare button)
+                // Clipped: AFTER image (right side of divider)
                 if (afterBitmap != null && !holdingOriginal && boxSize.width > 0) {
-                    val clipWidthDp = with(LocalDensity.current) {
+                    val clipWidthDp = with(density) {
                         (boxSize.width * (1f - splitFraction)).toDp()
                     }
                     Box(
@@ -208,10 +179,10 @@ fun BeforeAfterStage(
                         Image(
                             bitmap = afterBitmap.asImageBitmap(),
                             contentDescription = "After",
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.FillBounds,
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
-                                .width(with(LocalDensity.current) { boxSize.width.toDp() })
+                                .width(with(density) { boxSize.width.toDp() })
                                 .fillMaxHeight()
                         )
                     }
@@ -222,7 +193,7 @@ fun BeforeAfterStage(
                     Image(
                         bitmap = maskBitmap.asImageBitmap(),
                         contentDescription = "Mask Overlay",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.FillBounds,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -238,7 +209,7 @@ fun BeforeAfterStage(
                                 color = StudioColors.Sky,
                                 topLeft = Offset(face.box.left * sx, face.box.top * sy),
                                 size = Size(face.box.width() * sx, face.box.height() * sy),
-                                style = Stroke(width = 3.dp.toPx(), pathEffect = dash)
+                                style = Stroke(width = 2.5.dp.toPx(), pathEffect = dash)
                             )
                             face.landmarks.forEach { (lx, ly) ->
                                 drawCircle(
@@ -252,15 +223,16 @@ fun BeforeAfterStage(
                 }
             }
 
-            // Before/After Divider, Badges & Hold-to-Compare Eye Button
+            // Before/After Divider, Properly Centered Knob, Zoom & Hold-to-Compare
             if (hasAfter && boxSize.width > 0) {
                 if (holdingOriginal) {
                     TagBadge("ORIGINAL (HOLDING)", Color.White, Modifier.align(Alignment.TopStart).padding(10.dp))
                 } else {
                     TagBadge("BEFORE", Color.White, Modifier.align(Alignment.TopStart).padding(10.dp))
-                    TagBadge(afterBadgeLabel, StudioColors.Mint, Modifier.align(Alignment.TopEnd).padding(10.dp))
+                    TagBadge(afterBadgeLabel, StudioColors.Coral, Modifier.align(Alignment.TopEnd).padding(10.dp))
 
                     val lineX = (boxSize.width * splitFraction).roundToInt()
+                    val halfKnobPx = with(density) { 17.dp.roundToPx() }
                     Box(
                         modifier = Modifier
                             .offset { IntOffset(lineX - 1, 0) }
@@ -270,7 +242,7 @@ fun BeforeAfterStage(
                     )
                     Box(
                         modifier = Modifier
-                            .offset { IntOffset(lineX - 44, (boxSize.height / 2) - 44) }
+                            .offset { IntOffset(lineX - halfKnobPx, (boxSize.height / 2) - halfKnobPx) }
                             .size(34.dp)
                             .clip(CircleShape)
                             .background(Color.White),
@@ -280,13 +252,38 @@ fun BeforeAfterStage(
                     }
                 }
 
-                // Hold-to-Compare Eye Pill (bottom-right of canvas)
+                // Bottom-left: Quick 1x / 2x / 3x Zoom toggle for inspecting 4x HD detail
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(StudioColors.GlassDark)
+                        .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                zoomScale = when {
+                                    zoomScale < 1.5f -> 2f
+                                    zoomScale < 2.5f -> 3f
+                                    else -> 1f
+                                }
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Rounded.ZoomIn, contentDescription = "Zoom", tint = StudioColors.TextPrimary, modifier = Modifier.size(14.dp))
+                        Text("${zoomScale.roundToInt()}×", color = StudioColors.TextPrimary, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Bottom-right: Hold-to-Compare Eye Pill
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(10.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color(0xCC12161F))
+                        .background(StudioColors.GlassDark)
                         .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
                         .pointerInput(Unit) {
                             detectTapGestures(
@@ -306,27 +303,18 @@ fun BeforeAfterStage(
                 }
             }
 
-            // Zoom Indicator Pill
-            if (zoomScale > 1.05f) {
-                TagBadge(
-                    "${"%.1f".format(zoomScale)}× • Double-tap reset",
-                    StudioColors.Sky,
-                    Modifier.align(Alignment.BottomStart).padding(10.dp)
-                )
-            }
-
             // Live Processing HUD
             if (isProcessing) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xC4080A0F))
+                        .background(Color(0xD00E0A14))
                         .padding(20.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CircularProgressIndicator(
-                        color = StudioColors.Mint,
+                        color = StudioColors.Magenta,
                         strokeWidth = 3.dp,
                         modifier = Modifier.size(36.dp)
                     )
@@ -345,7 +333,7 @@ fun BeforeAfterStage(
                     )
                     LinearProgressIndicator(
                         progress = { hudProgress.coerceIn(0f, 1f) },
-                        color = StudioColors.Mint,
+                        color = StudioColors.Coral,
                         trackColor = Color.White.copy(alpha = 0.14f),
                         modifier = Modifier
                             .width(210.dp)
@@ -364,7 +352,7 @@ fun BeforeAfterStage(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .clip(RoundedCornerShape(999.dp))
-                .background(StudioColors.Surface.copy(alpha = 0.9f))
+                .background(StudioColors.GlassDark)
                 .border(1.dp, StudioColors.Border, RoundedCornerShape(999.dp))
                 .padding(horizontal = 12.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -389,8 +377,8 @@ private fun TagBadge(text: String, tint: Color, modifier: Modifier) {
         fontSize = 10.sp,
         fontWeight = FontWeight.ExtraBold,
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xB80B0D12))
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color(0xB80E0A14))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     )
 }
