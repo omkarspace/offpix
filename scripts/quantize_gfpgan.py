@@ -61,7 +61,7 @@ def export_gfpgan(weights_path: Path, profile: str) -> Path:
             self.core = core
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
-            out, _ = self.core(x, return_rgb=False)
+            out, _ = self.core(x, return_rgb=False, randomize_noise=False)
             return out
 
     wrapped = GfpganWrapper(model).eval()
