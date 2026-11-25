@@ -77,6 +77,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    lint {
+        // Avoid known AGP 8.7 + lifecycle-2.8 NonNullableMutableLiveDataDetector lint crash on release builds
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 dependencies {
