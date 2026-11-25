@@ -1,4 +1,4 @@
-﻿package com.offpix.app.io
+package com.offpix.app.io
 
 import android.content.ContentValues
 import android.content.Context

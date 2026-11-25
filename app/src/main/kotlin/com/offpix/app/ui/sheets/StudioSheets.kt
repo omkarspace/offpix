@@ -145,9 +145,14 @@ fun ExportBottomSheet(
                     onClick = onConfirmSave,
                     modifier = Modifier
                         .weight(0.58f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = StudioColors.Mint, contentColor = StudioColors.OnMint)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(StudioColors.PrimaryGradient),
+                    shape = RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        contentColor = androidx.compose.ui.graphics.Color.White
+                    )
                 ) {
                     Text("Save to Gallery", fontWeight = FontWeight.ExtraBold, fontSize = 14.5.sp)
                 }
@@ -159,13 +164,15 @@ fun ExportBottomSheet(
 
 @Composable
 private fun FormatChip(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val bg = if (selected) StudioColors.Surface3 else StudioColors.Bg
-    val fg = if (selected) StudioColors.TextPrimary else StudioColors.TextSecondary
+    val fg = if (selected) androidx.compose.ui.graphics.Color.White else StudioColors.TextSecondary
     Row(
         modifier = modifier
             .height(36.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(bg)
+            .clip(RoundedCornerShape(999.dp))
+            .then(
+                if (selected) Modifier.background(StudioColors.PrimaryGradient)
+                else Modifier.background(StudioColors.Bg)
+            )
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically

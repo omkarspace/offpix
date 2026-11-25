@@ -1,4 +1,4 @@
-﻿package com.offpix.app.ui.theme
+package com.offpix.app.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme

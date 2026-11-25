@@ -1,0 +1,117 @@
+name: Release OffPix APK on GitHub
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+        type: string
+      include_gfpgan:
+        description: "Bundle 411 MB GFPGAN model inside APK (true/false)"
+        required: false
+        default: "false"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download verified open-source LiteRT models
+        run: |
+          if [ "${{ github.event.inputs.include_gfpgan }}" = "true" ]; then
+            python scripts/fetch_models.py --include-gfpgan
+          else
+            python scripts/fetch_models.py
+          fi
+          mkdir -p app/src/main/assets/models
+          cp pack_models/src/main/assets/models/*.tflite app/src/main/assets/models/
+          if [ -f app/src/main/assets/models/gfpgan_v14_fp16.tflite ] && [ ! -f app/src/main/assets/models/gfpgan_v14_opt.tflite ]; then
+            mv app/src/main/assets/models/gfpgan_v14_fp16.tflite app/src/main/assets/models/gfpgan_v14_opt.tflite
+          fi
+          ls -lh app/src/main/assets/models/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Prepare Android release signing keystore
+        run: |
+          if [ -z "${{ secrets.OFFPIX_KEYSTORE_BASE64 }}" ]; then
+            echo "Generating ephemeral release signing key for direct GitHub APK sideloading..."
+            keytool -genkeypair -v \
+              -keystore /tmp/offpix-release.jks \
+              -alias offpix \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass offpix_release_pass \
+              -keypass offpix_release_pass \
+              -dname "CN=OffPix, OU=Mobile, O=OffPix, L=Local, S=NA, C=US"
+            echo "OFFPIX_KEYSTORE_PATH=/tmp/offpix-release.jks" >> $GITHUB_ENV
+            echo "OFFPIX_KEYSTORE_PASSWORD=offpix_release_pass" >> $GITHUB_ENV
+            echo "OFFPIX_KEY_ALIAS=offpix" >> $GITHUB_ENV
+            echo "OFFPIX_KEY_PASSWORD=offpix_release_pass" >> $GITHUB_ENV
+          else
+            echo "${{ secrets.OFFPIX_KEYSTORE_BASE64 }}" | base64 -d > /tmp/offpix-release.jks
+            echo "OFFPIX_KEYSTORE_PATH=/tmp/offpix-release.jks" >> $GITHUB_ENV
+            echo "OFFPIX_KEYSTORE_PASSWORD=${{ secrets.OFFPIX_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "OFFPIX_KEY_ALIAS=${{ secrets.OFFPIX_KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "OFFPIX_KEY_PASSWORD=${{ secrets.OFFPIX_KEY_PASSWORD }}" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Run unit tests & build signed Release APK
+        run: |
+          gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace
+          TAG_NAME="${{ github.event.inputs.tag || github.ref_name }}"
+          OUT_APK="OffPix-${TAG_NAME}-offline.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$OUT_APK"
+          ls -lh "$OUT_APK"
+          echo "RELEASE_TAG=$TAG_NAME" >> $GITHUB_ENV
+          echo "RELEASE_APK=$OUT_APK" >> $GITHUB_ENV
+
+      - name: Publish GitHub Release with APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat <<'EOF' > /tmp/release_notes.md
+          ## OffPix — 100% Offline AI Photo Rescue Studio
+
+          - **Zero Cloud • Zero Login • Zero Ads • Zero Tracking** (`INTERNET` permission explicitly removed)
+          - **4x Ultra HD Upscale** — Real-ESRGAN General x4v3 (BSD-3-Clause) with overlapped raised-cosine tiling, pinch-to-zoom (`1x–4x`), and Hold-to-Compare
+          - **Motion Unblur** — NAFNet-GoPro-width32 (MIT) tiled deblurring
+          - **Magic Eraser** — SAM 2.1 `v2_fp16` (Apache 2.0) bit-exact tap-to-select + smooth Brush + 6 px mask dilation + MI-GAN 512 (MIT) inpainting + iterative Erase Another
+          - **Hardware Acceleration** — Standalone Google LiteRT (`CompiledModel`) with automatic `NPU → GPU (ML Drift) → CPU (XNNPACK)` fallback
+
+          ### How to Install
+          Download the `.apk` below on your Android 8.0+ phone and tap to install (works 100% in Airplane Mode).
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$RELEASE_APK" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$RELEASE_APK" \
+              --title "OffPix $RELEASE_TAG — 100% Offline AI Photo Studio" \
+              --notes-file /tmp/release_notes.md
+          fi
